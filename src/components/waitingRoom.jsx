@@ -8,24 +8,32 @@ function WaitingRoom() {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const paramValue = searchParams.get("f");
-  const [message, setMessage] = useState("");
+  const [playerName, setPlayerName] = useState("");
   const [receivedMessages, setReceivedMessages] = useState([]);
+
+  const createRoom = () => {};
 
   const handleStartGame = (e) => {
     e.preventDefault();
   };
   const sendMessage = () => {
-    if (message && message.length) {
-      setMessage("");
-      socket.emit("send_message", { message });
+    if (playerName && playerName.length) {
+      setPlayerName("");
+      socket.emit("send_message", { playerName });
     }
   };
 
-  const createRoom = () => {};
+  useEffect(() => {
+    socket.emit("get_data");
+    socket.on("send_data", (data) => {
+      console.log({ data });
+      setReceivedMessages(data);
+    });
+  }, []);
 
   useEffect(() => {
     socket.on("receive_message", (data) => {
-      setReceivedMessages((prevMessages) => [...prevMessages, data.message]);
+      setReceivedMessages((prevMessages) => [...prevMessages, data.playerName]);
     });
 
     return () => {
@@ -34,13 +42,16 @@ function WaitingRoom() {
   }, [socket]);
 
   return (
-    <>
-      <div className="flex flex-col m-auto mt-[50px] py-8 w-[450px] p-2 gap-6 rounded-sm bg-gray-200 drop-shadow-md">
+    <div
+      className="flex flex-col gap-1"
+      style={{ minHeight: "calc(100vh - 164px)" }}
+    >
+      <div className="flex flex-col m-auto py-8 mt-[50px] w-[450px] p-2 gap-6 rounded-sm bg-gray-200 drop-shadow-md">
         <h1 className="text-2xl font-bold">Enter your name to join the game</h1>
         <input
-          value={message}
+          value={playerName}
           placeholder="Enter message"
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={(e) => setPlayerName(e.target.value)}
           className="px-3 py-2"
         />
         <button
@@ -50,8 +61,8 @@ function WaitingRoom() {
           Submit
         </button>
       </div>
-      <div>
-        <div className="m-auto mt-[50px] w-[450px] p-2 gap-2 flex flex-col rounded-sm bg-gray-200 drop-shadow-md">
+      <div className="m-auto">
+        <div className="m-auto my-[50px] w-[450px] p-2 gap-2 flex flex-col rounded-sm bg-gray-200 drop-shadow-md">
           <h1 className="text-2xl font-bold">Waiting for players to join</h1>
           <h2>
             You need at least 3 players to run the game. Once the game has
@@ -82,7 +93,7 @@ function WaitingRoom() {
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
