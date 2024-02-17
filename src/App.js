@@ -1,32 +1,21 @@
-import { useEffect, useState } from "react";
 import "./App.css";
-import io from "socket.io-client";
-import Header from "./components/header";
-import Footer from "./components/footer";
-import WaitingRoom from "./components/waitingRoom";
-import Entry from "./components/entry";
-const socket = io.connect("http://localhost:5000");
+import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
+import WaitingRoom from "./components/WaitingRoom";
+import Header from "./components/Header";
+import Footer from "./components/Footer";
 
 function App() {
-  const [message, setMessage] = useState("");
-  const [recievedMessage, setRecievedMessage] = useState("");
-
-  const sendMessage = () => {
-    socket.emit("send_message", { message });
-  };
-
-  useEffect(() => {
-    socket.on("recieive_message", (data) => {
-      setRecievedMessage(data.message);
-    });
-  }, [socket]);
-
   return (
     <>
-      <Header></Header>
-      <WaitingRoom></WaitingRoom>
-      {/* <Entry></Entry> */}
-      <Footer></Footer>
+      <div className="App">
+        <Header></Header>
+        <Router>
+          <Routes>
+            <Route path="/" exact element={<WaitingRoom />} />
+          </Routes>
+        </Router>
+        <Footer></Footer>
+      </div>
     </>
   );
 }
