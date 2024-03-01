@@ -2,13 +2,25 @@ import React, { useEffect, useState } from "react";
 import io from "socket.io-client";
 import { useLocation } from "react-router-dom";
 
-const socket = io.connect("http://localhost:5000");
-
 function generateRandomId() {
   const min = 100000;
   const max = 999999;
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
+
+function generateUserId() {
+  const length = 8;
+  const characters =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let userId = "";
+  for (let i = 0; i < length; i++) {
+    userId += characters.charAt(Math.floor(Math.random() * characters.length));
+  }
+  return userId;
+}
+
+const socket = io.connect("http://localhost:5000");
+const SOCKET_STORAGE_KEY = "socketConnection";
 
 function WaitingRoom() {
   const location = useLocation();
@@ -22,29 +34,27 @@ function WaitingRoom() {
 
   const startGame = (e) => {
     e.preventDefault();
-    const roomId = generateRandomId();
-    if (
-      playersPerTeam > 0 &&
-      players.length > 0 &&
-      players.length % playersPerTeam === 0
-    ) {
-      const data = { players, roomId, teamSize: playersPerTeam };
+    if (playersPerTeam > 0 && playersPerTeam >= players.length) {
+      const roomId = generateRandomId();
+      const data = { roomId, teamSize: playersPerTeam };
       socket.emit("join_room", data);
+      return () => {
+        socket.off("join_room");
+      };
     }
-
-    return () => {
-      socket.off("join_room");
-    };
   };
 
   const addPlayer = () => {
     if (playerName && playerName.length) {
       setPlayerName("");
-      const data = { socketId: socket.id, name: playerName };
+      const data = {
+        id: generateUserId(),
+        socketId: socket.id,
+        name: playerName,
+        isRoomCreated: false,
+        isCurrentPlayer: players && players.length === 0,
+      };
       socket.emit("add_player", data);
-      socket.on("waiting", (data) => {
-        // console.log({ data });
-      });
       setRegisteredName(playerName);
 
       return () => {
@@ -53,18 +63,41 @@ function WaitingRoom() {
     }
   };
 
-  const addQueryParam = (key, value) => {
-    const searchParams = new URLSearchParams(location.search);
-    searchParams.set(key, value);
-    const newUrl = `${location.pathname}?${searchParams.toString()}`;
-    window.history.pushState({ path: newUrl }, "", newUrl);
-  };
-
   useEffect(() => {
-    socket.emit("get_data");
-    socket.on("send_data", (data) => {
+    socket.emit("fetch_players");
+    socket.on("set_players", (data) => {
       setPlayers(data);
     });
+
+    socket.on("socket_connected", (data) => {
+      const oldSocketId = JSON.parse(localStorage.getItem(SOCKET_STORAGE_KEY));
+      if (oldSocketId === null) {
+        localStorage.setItem(
+          SOCKET_STORAGE_KEY,
+          JSON.stringify({ id: socket.id }),
+        );
+        return;
+      }
+      if (socket.id !== oldSocketId.id) {
+        localStorage.setItem(
+          SOCKET_STORAGE_KEY,
+          JSON.stringify({ id: socket.id }),
+        );
+        socket.emit("update_socket_connection", {
+          oldId: oldSocketId.id,
+          newId: socket.id,
+        });
+      }
+    });
+
+    socket.on("room_users", ({ id, roomId, socketId, teamId }) => {
+      if (socketId === socket.id) {
+        setRoomCreated(true);
+        const url = `/gameboard?roomId=${roomId}&teamId=${teamId}`;
+        window.location.href = url;
+      }
+    });
+
     const player = document.cookie
       .split("; ")
       .find((cookie) => cookie.startsWith("randomRoom1234"));
@@ -73,22 +106,15 @@ function WaitingRoom() {
     }
 
     return () => {
-      socket.off("send_data");
+      socket.off("set_players");
+      socket.off("socket_connected");
     };
   }, []);
 
   useEffect(() => {
     socket.on("update_player_list", (data) => {
+      console.log({ data });
       setPlayers((prevMessages) => [...prevMessages, data]);
-    });
-
-    socket.on("room_users", ({ roomId, socketId, teamId }) => {
-      if (socketId === socket.id) {
-        addQueryParam("room", roomId);
-        setRoomCreated(true);
-        const url = `/gameboard?roomId=${roomId}&teamId=${teamId}`;
-        window.location.href = url;
-      }
     });
 
     socket.on("setCookie", ({ key, value }) => {
@@ -97,7 +123,6 @@ function WaitingRoom() {
 
     return () => {
       socket.off("receive_message");
-      socket.off("room_users");
       socket.off("update_player_list");
     };
   }, [socket]);
@@ -138,7 +163,7 @@ function WaitingRoom() {
               {paramValue === "me" && (
                 <>
                   <input
-                    value={playersPerTeam == 0 ? "" : playersPerTeam}
+                    value={playersPerTeam === 0 ? "" : playersPerTeam}
                     placeholder="Enter players per team"
                     onChange={(e) => setPlayersPerTeam(e.target.value)}
                     className="px-3 py-2"
