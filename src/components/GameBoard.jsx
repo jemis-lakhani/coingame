@@ -2,24 +2,30 @@ import React, { useEffect, useState } from "react";
 import Dot from "./Dot";
 import io from "socket.io-client";
 import { useLocation } from "react-router-dom";
+import clsx from "clsx";
 
 const socket = io.connect("http://localhost:5000");
 
+const NEXT_BTN_TEXT = "Move Turn to Next Player";
+const NEXT_ROUND_TXT = "Start New Round";
+
 const GameBoard = () => {
+  // Params
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const teamId = searchParams.get("teamId");
   const roomId = searchParams.get("roomId");
+  // Players/Game stats
   const [players, setPlayers] = useState([]);
-  const [currentPlayerId, setCurrentPlayerId] = useState("");
   const [playerName, setPlayerName] = useState();
   const [clickedDot, setClickedDot] = useState({});
-  const [isAllowToNext, setNext] = useState(false);
-  const [dotCount, setDotCount] = useState(20);
+  const [batchSize, setBatchSize] = useState(20);
+  const [round, setRound] = useState("round1");
+  const [isRoundCompleted, setRoundCompleted] = useState(false);
 
   useEffect(() => {
     if (socket) {
-      socket.emit("fetch_team_players", { teamId, roomId, round: "round1" });
+      socket.emit("fetch_team_players", { teamId, roomId, round });
       socket.on(
         "team_players",
         ({ roomId: rId, teamId: tId, players, clickedDot }) => {
@@ -27,6 +33,17 @@ const GameBoard = () => {
             setPlayers(players);
             setClickedDot(clickedDot);
           }
+        },
+      );
+
+      socket.on(
+        "team_players_updated",
+        ({ players, clickedDot, isRoundCompleted }) => {
+          console.log({ players });
+          console.log({ clickedDot });
+          setPlayers(players);
+          setClickedDot(clickedDot);
+          setRoundCompleted(isRoundCompleted);
         },
       );
 
@@ -54,12 +71,22 @@ const GameBoard = () => {
         playerId={playerId}
         socket={socket}
         clickedDot={clickedDot}
-        dotCount={dotCount}
+        batchSize={batchSize}
       />
     );
   };
 
-  const loopArray = new Array(dotCount).fill(null);
+  const moveToNextPlayer = (playerId) => {
+    socket.emit("check_for_next_turn", {
+      playerId,
+      teamId,
+      roomId,
+      batchSize,
+      round,
+    });
+  };
+
+  const loopArray = new Array(batchSize).fill(null);
   return (
     <div className="container max-w-[1000px] mx-auto">
       <div className="flex flex-col gap-3 mt-5">
@@ -87,12 +114,15 @@ const GameBoard = () => {
                       </div>
                     ))}
                   </div>
-                  {p.name === playerName && (
+                  {p.name === playerName && !p[round] && (
                     <button
+                      onClick={() => moveToNextPlayer(p.id)}
                       disabled={!p.isCurrentPlayer}
-                      className={`rounded-sm mt-3 px-4 py-2 bg-green-700 text-green-100 duration-300 disabled:opacity-50`}
+                      className={
+                        "rounded-lg px-4 py-2 bg-green-600 border-b-0 border-green-700 text-green-100 duration-300 disabled:opacity-50"
+                      }
                     >
-                      Move turn to next player
+                      {isRoundCompleted ? NEXT_ROUND_TXT : NEXT_BTN_TEXT}
                     </button>
                   )}
                 </div>

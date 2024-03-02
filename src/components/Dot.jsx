@@ -7,7 +7,7 @@ const Dot = ({
   roomId,
   socket,
   clickedDot,
-  dotCount,
+  batchSize,
 }) => {
   const [clicked, setClicked] = useState(false);
 
