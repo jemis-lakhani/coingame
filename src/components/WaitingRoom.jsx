@@ -37,9 +37,9 @@ function WaitingRoom() {
     if (playersPerTeam > 0 && playersPerTeam >= players.length) {
       const roomId = generateRandomId();
       const data = { roomId, teamSize: playersPerTeam };
-      socket.emit("join_room", data);
+      socket.emit("start_game", data);
       return () => {
-        socket.off("join_room");
+        socket.off("start_game");
       };
     }
   };
@@ -54,22 +54,22 @@ function WaitingRoom() {
         isRoomCreated: false,
         isCurrentPlayer: players && players.length === 0,
       };
-      socket.emit("add_player", data);
+      socket.emit("add_player_to_team", data);
       setRegisteredName(playerName);
 
       return () => {
-        socket.off("add_player");
+        socket.off("add_player_to_team");
       };
     }
   };
 
   useEffect(() => {
-    socket.emit("fetch_players");
-    socket.on("set_players", (data) => {
+    socket.emit("fetch_waiting_room_players");
+    socket.on("set_waiting_room_players", (data) => {
       setPlayers(data);
     });
 
-    socket.on("socket_connected", (data) => {
+    socket.on("update_socket_connection", (data) => {
       const oldSocketId = JSON.parse(localStorage.getItem(SOCKET_STORAGE_KEY));
       if (oldSocketId === null) {
         localStorage.setItem(
@@ -90,7 +90,7 @@ function WaitingRoom() {
       }
     });
 
-    socket.on("room_users", ({ id, roomId, socketId, teamId }) => {
+    socket.on("join_room", ({ id, roomId, socketId, teamId }) => {
       if (socketId === socket.id) {
         setRoomCreated(true);
         const url = `/gameboard?roomId=${roomId}&teamId=${teamId}`;
@@ -106,14 +106,14 @@ function WaitingRoom() {
     }
 
     return () => {
-      socket.off("set_players");
-      socket.off("socket_connected");
+      socket.off("join_room");
+      socket.off("update_socket_connection");
+      socket.off("set_waiting_room_players");
     };
   }, []);
 
   useEffect(() => {
     socket.on("update_player_list", (data) => {
-      console.log({ data });
       setPlayers((prevMessages) => [...prevMessages, data]);
     });
 
@@ -122,7 +122,7 @@ function WaitingRoom() {
     });
 
     return () => {
-      socket.off("receive_message");
+      socket.off("setCookie");
       socket.off("update_player_list");
     };
   }, [socket]);

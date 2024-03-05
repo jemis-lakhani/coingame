@@ -11,11 +11,11 @@ function App() {
   return (
     <>
       <SocketProvider>
-        <div className="App">
+        <div className="flex flex-col">
           <Header></Header>
           <div
             className="flex flex-col gap-1"
-            style={{ minHeight: "calc(100vh - 112px)" }}
+            style={{ minHeight: "calc(100vh - 104px)" }}
           >
             <Router>
               <Routes>
