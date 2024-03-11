@@ -23,7 +23,6 @@ const PlayerTimer = ({ startTimer, handlePlayerTime }) => {
         });
       }, 1);
     } else {
-      console.log("All dots clicked");
       handlePlayerTime(seconds, miliSeconds);
     }
 

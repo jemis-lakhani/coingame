@@ -7,7 +7,7 @@ const Dot = ({
   roomId,
   round,
   socket,
-  clickedDot,
+  clickedDots,
   batchSize,
   handlePlayerTimer,
 }) => {
@@ -15,7 +15,7 @@ const Dot = ({
   const [isAnyDotClicked, setDotClicked] = useState(false);
 
   useEffect(() => {
-    const data = clickedDot.find((obj) => obj.id === playerId);
+    const data = clickedDots.find((obj) => obj.id === playerId);
     if (data !== null && data !== undefined) {
       if (data["clicked_dots"][round].includes(dotIndex)) {
         setClicked(true);

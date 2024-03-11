@@ -28,7 +28,7 @@ const GameBoard = () => {
   // Players/Game stats
   const [players, setPlayers] = useState([]);
   const [playerName, setPlayerName] = useState();
-  const [clickedDot, setClickedDot] = useState({});
+  const [clickedDots, setClickedDots] = useState({});
   const [batchSize, setBatchSize] = useState(4);
   const [round, setRound] = useState("round1");
   const [isRoundCompleted, setRoundCompleted] = useState(false);
@@ -47,10 +47,10 @@ const GameBoard = () => {
     if (socket) {
       socket.on(
         "team_players",
-        ({ roomId: rId, teamId: tId, players, clickedDot }) => {
+        ({ roomId: rId, teamId: tId, players, clickedDots }) => {
           if (roomId === rId && teamId === tId) {
             setPlayers(players);
-            setClickedDot(clickedDot);
+            setClickedDots(clickedDots);
             players.forEach((p) => {
               updatePlayerTime(p.name);
             });
@@ -67,9 +67,9 @@ const GameBoard = () => {
 
       socket.on(
         "next_player_turn",
-        ({ players, clickedDot, isRoundCompleted }) => {
-          setPlayers(players);
-          setClickedDot(clickedDot);
+        ({ teamPlayers, clickedDots, isRoundCompleted }) => {
+          setPlayers(teamPlayers);
+          setClickedDots(clickedDots);
           setRoundCompleted(isRoundCompleted);
         },
       );
@@ -79,10 +79,10 @@ const GameBoard = () => {
       });
 
       return () => {
-        socket.off("team_players_updated");
-        socket.off("team_timer_started");
-        socket.off("get_players_time");
         socket.off("team_players");
+        socket.off("team_timer_started");
+        socket.off("next_player_turn");
+        socket.off("set_players_time");
       };
     }
   }, [socket]);
@@ -124,7 +124,9 @@ const GameBoard = () => {
           };
         }
       });
-      setTimeUpdated(true);
+      if (seconds !== 0 && miliSeconds !== 0) {
+        setTimeUpdated(true);
+      }
     }
   };
 
@@ -137,7 +139,7 @@ const GameBoard = () => {
     }
   }, []);
 
-  const generateDot = (dotIndex, playerId, clickedDot) => {
+  const generateDot = (dotIndex, playerId, clickedDots) => {
     return (
       <Dot
         dotIndex={dotIndex}
@@ -146,7 +148,7 @@ const GameBoard = () => {
         playerId={playerId}
         round={round}
         socket={socket}
-        clickedDot={clickedDot}
+        clickedDots={clickedDots}
         batchSize={batchSize}
         handlePlayerTimer={handlePlayerTimer}
       />
@@ -206,7 +208,7 @@ const GameBoard = () => {
                   >
                     {loopArray.map((item, index) => (
                       <div key={index} className="m-2">
-                        {generateDot(index, p.id, clickedDot)}
+                        {generateDot(index, p.id, clickedDots)}
                       </div>
                     ))}
                   </div>
@@ -253,22 +255,24 @@ const GameBoard = () => {
                     </thead>
                     <tbody>
                       {players.length > 0 &&
+                        Object.keys(playersTime).length !== 0 &&
                         players.map((p) => {
                           return (
                             <tr key={p.id}>
                               <td className={TdStyle.TdStyle}>{p.name}</td>
-                              {Object.entries(playersTime[p.name]).map(
-                                ([key, value], index) => {
-                                  return (
-                                    <td
-                                      key={index}
-                                      className={TdStyle.TdStyle2}
-                                    >
-                                      {value}
-                                    </td>
-                                  );
-                                },
-                              )}
+                              {playersTime[p.name] &&
+                                Object.entries(playersTime[p.name]).map(
+                                  ([key, value], index) => {
+                                    return (
+                                      <td
+                                        key={index}
+                                        className={TdStyle.TdStyle2}
+                                      >
+                                        {value}
+                                      </td>
+                                    );
+                                  },
+                                )}
                             </tr>
                           );
                         })}
