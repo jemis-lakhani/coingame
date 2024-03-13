@@ -92,17 +92,24 @@ function WaitingRoom() {
     socket.on("join_room", ({ id, roomId, socketId, teamId }) => {
       if (socketId === socket.id) {
         setRoomCreated(true);
-        const url = `/gameboard?roomId=${roomId}&teamId=${teamId}`;
+        let url = "";
+        if (paramValue === "me") {
+          url = `/gameboard?f=me&roomId=${roomId}&teamId=${teamId}`;
+        } else {
+          url = `/gameboard?&roomId=${roomId}&teamId=${teamId}`;
+        }
         window.location.href = url;
       }
     });
 
-    const player = document.cookie
-      .split("; ")
-      .find((cookie) => cookie.startsWith("randomRoom1234"));
-    if (player) {
-      setRegisteredName(player.replace("randomRoom1234", ""));
-    }
+    // const player = document.cookie
+    //   .split("; ")
+    //   .find((cookie) => cookie.startsWith("randomRoom1234"));
+    // if (player) {
+    //   setRegisteredName(player.replace("randomRoom1234", ""));
+    // }
+
+    deleteCookie("randomRoom1234");
 
     return () => {
       socket.off("join_room");
@@ -110,6 +117,10 @@ function WaitingRoom() {
       socket.off("set_waiting_room_players");
     };
   }, []);
+
+  function deleteCookie(cookieName) {
+    document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+  }
 
   useEffect(() => {
     socket.on("update_player_list", (data) => {

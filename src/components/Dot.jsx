@@ -9,27 +9,31 @@ const Dot = ({
   socket,
   clickedDots,
   batchSize,
-  handlePlayerTimer,
 }) => {
+  // console.log("player id >>>", playerId, ">>> dot index >>>", dotIndex);
   const [clicked, setClicked] = useState(false);
   const [isAnyDotClicked, setDotClicked] = useState(false);
 
   useEffect(() => {
-    const data = clickedDots.find((obj) => obj.id === playerId);
+    const data = clickedDots.find((obj) => obj.playerId === playerId);
     if (data !== null && data !== undefined) {
       if (data["clicked_dots"][round].includes(dotIndex)) {
         setClicked(true);
+      } else {
+        setClicked(false);
       }
     }
-  }, []);
+  }, [round]);
 
   useEffect(() => {
-    socket.on("dot_clicked_update", (data) => {
-      if (data.playerId === playerId && data.dots.includes(dotIndex)) {
+    socket.on("dot_clicked_update", ({ teamData }) => {
+      // console.log({ teamData });
+      let player = teamData.find((obj) => obj.playerId === playerId);
+      const clickedDots = player["clicked_dots"][round];
+      if (clickedDots.includes(dotIndex)) {
         setClicked(true);
-        if (data.dots.length >= batchSize) {
-          handlePlayerTimer(socket.id, false);
-        }
+      } else {
+        setClicked(false);
       }
     });
   }, [socket]);
@@ -41,11 +45,11 @@ const Dot = ({
       roomId,
       dotIndex,
       round,
+      batchSize,
     });
     if (!isAnyDotClicked) {
       setDotClicked(true);
       socket.emit("start_team_timer", { roomId, teamId });
-      handlePlayerTimer(socket.id, true);
     }
   };
 

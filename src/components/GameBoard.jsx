@@ -25,17 +25,21 @@ const GameBoard = () => {
   const searchParams = new URLSearchParams(location.search);
   const teamId = searchParams.get("teamId");
   const roomId = searchParams.get("roomId");
+  const isFaciliator = searchParams.get("f") === "me";
   // Players/Game stats
   const [players, setPlayers] = useState([]);
   const [playerName, setPlayerName] = useState();
   const [clickedDots, setClickedDots] = useState({});
   const [batchSize, setBatchSize] = useState(4);
   const [round, setRound] = useState("round1");
-  const [isRoundCompleted, setRoundCompleted] = useState(false);
   const [playersTime, setPlayersTime] = useState({});
   const [isTimeUpdated, setTimeUpdated] = useState(false);
   const [startTeamTimer, setStartTeamTimer] = useState(false);
   const [startTimer, setStartTimer] = useState(false);
+  const [isNextTurnEnabled, setNextTurnEnabled] = useState(false);
+  const [isRoundCompleted, setRoundCompleted] = useState(false);
+  const [completedDots, setCompletedDots] = useState(0);
+  const [isLastPlayer, setLastPlayer] = useState(false);
 
   useEffect(() => {
     if (socket) {
@@ -67,12 +71,49 @@ const GameBoard = () => {
 
       socket.on(
         "next_player_turn",
-        ({ teamPlayers, clickedDots, isRoundCompleted }) => {
-          setPlayers(teamPlayers);
-          setClickedDots(clickedDots);
-          setRoundCompleted(isRoundCompleted);
+        ({
+          teamPlayers,
+          clickedDots,
+          isRoundCompleted,
+          isLastPlayer,
+          completedDots,
+        }) => {
+          console.log({ clickedDots });
+          console.log({ teamPlayers });
+          setLastPlayer(isLastPlayer);
+          if (isRoundCompleted) {
+            setRoundCompleted(true);
+            setStartTeamTimer(false);
+            const currentIndex = ROUND.indexOf("round1");
+            if (currentIndex !== -1) {
+              const nextRound = ROUND[currentIndex + 1];
+              setRound(nextRound);
+            }
+          } else {
+            setPlayers(teamPlayers);
+            setClickedDots(clickedDots);
+          }
         },
       );
+
+      socket.on("manage_next_turn", ({ isNextEnabled, isAllClicked }) => {
+        console.log({ isNextEnabled });
+        console.log({ isAllClicked });
+        setNextTurnEnabled(isNextEnabled);
+        if (!isAllClicked && !startTimer) {
+          setStartTimer(true);
+        } else {
+          setStartTimer(false);
+        }
+      });
+
+      socket.on("start_new_round", ({ players, clickedDots, batchSize }) => {
+        console.log({ players });
+        console.log({ clickedDots });
+        setClickedDots(clickedDots);
+        setPlayers(players);
+        setBatchSize(batchSize);
+      });
 
       socket.on("set_players_time", ({ playersTime }) => {
         setPlayersTime(playersTime);
@@ -83,6 +124,7 @@ const GameBoard = () => {
         socket.off("team_timer_started");
         socket.off("next_player_turn");
         socket.off("set_players_time");
+        socket.off("start_new_round");
       };
     }
   }, [socket]);
@@ -105,10 +147,6 @@ const GameBoard = () => {
         round4: "",
       },
     }));
-  };
-
-  const handlePlayerTimer = (socketId, isStart) => {
-    if (socketId === socket.id) setStartTimer(isStart);
   };
 
   const handlePlayerTime = (seconds, miliSeconds) => {
@@ -150,7 +188,6 @@ const GameBoard = () => {
         socket={socket}
         clickedDots={clickedDots}
         batchSize={batchSize}
-        handlePlayerTimer={handlePlayerTimer}
       />
     );
   };
@@ -165,17 +202,24 @@ const GameBoard = () => {
     });
   };
 
-  const loopArray = new Array(batchSize).fill(null);
+  const startNewRound = () => {
+    socket.emit("check_for_new_round", { round, teamId });
+  };
+
   return (
     <div className="container flex flex-row flex-wrap justify-center gap-8 max-w-[1400px] mx-auto">
       <div className="flex flex-col gap-6 w-full md:w-[85%] lg:w-[70%] xl:w-[50%] 2xl:w-[55%] my-5">
         {players && players.length > 0
           ? players.map((p, index) => {
+              let loopArray;
+              if (p.endIndex - p.startIndex >= 0) {
+                loopArray = new Array(p.endIndex - p.startIndex).fill(null);
+              }
               return (
                 <div
                   key={index}
                   className={clsx(
-                    "flex flex-col bg-white border-2 rounded-md p-2 mx-3",
+                    "flex flex-col bg-white border-2 rounded-md p-2 mx-3 min-h-[200px]",
                     {
                       "pointer-events-none": p.name !== playerName,
                       "ring-2 ring-green-600":
@@ -206,15 +250,18 @@ const GameBoard = () => {
                       invisible: !p.isCurrentPlayer,
                     })}
                   >
-                    {loopArray.map((item, index) => (
-                      <div key={index} className="m-2">
-                        {generateDot(index, p.id, clickedDots)}
-                      </div>
-                    ))}
+                    {loopArray.map((item, loopIndex) => {
+                      const index = loopIndex + p.startIndex;
+                      return (
+                        <div key={index} className="m-2">
+                          {generateDot(index, p.id, clickedDots)}
+                        </div>
+                      );
+                    })}
                   </div>
                   <button
                     onClick={() => moveToNextPlayer(p.id)}
-                    disabled={!p.isCurrentPlayer || p[round]}
+                    disabled={!isNextTurnEnabled}
                     className={clsx(
                       "flex items-center justify-center w-full bg-green-500 border-b-0 border-green-700 sm:w-auto rounded-md px-4 py-2 text-white disabled:opacity-50",
                       {
@@ -223,12 +270,25 @@ const GameBoard = () => {
                       },
                     )}
                   >
-                    {isRoundCompleted ? NEXT_ROUND_TXT : NEXT_BTN_TEXT}
+                    {NEXT_BTN_TEXT}
                   </button>
                 </div>
               );
             })
           : ""}
+        <div className="flex flex-col bg-white border-2 rounded-md p-2 mx-3 min-h-[200px]">
+          <div className="flex items-center bg-green-100 text-green-800 rounded-md whitespace-nowrap text-center leading-none p-2">
+            Customer
+          </div>
+          <div className={clsx("flex items-center flex-wrap w-100 my-3", {})}>
+            {Array.from({ length: completedDots }).map((_, index) => (
+              <div
+                key={index}
+                className={`h-12 w-12 bg-white rounded-full cursor-none`}
+              ></div>
+            ))}
+          </div>
+        </div>
       </div>
       <div className="flex flex-col gap-6 w-full md:w-[85%] lg:w-[70%] xl:w-[35%] 2xl:w-[40%] my-5">
         <div className="flex justify-around gap-2 mx-3">
@@ -247,10 +307,38 @@ const GameBoard = () => {
                     <thead className="text-center bg-gray-800">
                       <tr>
                         <th className={TdStyle.ThStyle}> Player </th>
-                        <th className={TdStyle.ThStyle}> Round1 </th>
-                        <th className={TdStyle.ThStyle}> Round2 </th>
-                        <th className={TdStyle.ThStyle}> Ronud3 </th>
-                        <th className={TdStyle.ThStyle}> Round4 </th>
+                        <th className={TdStyle.ThStyle}>
+                          <button
+                            disabled={"round1" !== round || !isFaciliator}
+                            onClick={() => startNewRound()}
+                          >
+                            Round1
+                          </button>
+                        </th>
+                        <th className={TdStyle.ThStyle}>
+                          <button
+                            disabled={"round2" !== round || !isFaciliator}
+                            onClick={() => startNewRound()}
+                          >
+                            Round2
+                          </button>
+                        </th>
+                        <th className={TdStyle.ThStyle}>
+                          <button
+                            disabled={"round3" !== round || !isFaciliator}
+                            onClick={() => startNewRound()}
+                          >
+                            Round3
+                          </button>
+                        </th>
+                        <th className={TdStyle.ThStyle}>
+                          <button
+                            disabled={"round4" !== round || !isFaciliator}
+                            onClick={() => startNewRound()}
+                          >
+                            Round4
+                          </button>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
