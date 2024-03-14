@@ -1,11 +1,11 @@
 import "./App.css";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import WaitingRoom from "./components/WaitingRoom";
-import Header from "./components/Header";
-import Footer from "./components/Footer";
 import Entry from "./components/Entry";
 import GameBoard from "./components/GameBoard";
 import { SocketProvider } from "./context/SocketContext";
+import Header from "./components/layout/Header";
+import Footer from "./components/layout/Footer";
 
 function App() {
   return (

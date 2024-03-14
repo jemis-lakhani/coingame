@@ -3,7 +3,7 @@ import React from "react";
 function Header() {
   return (
     <header>
-      <div className="bg-gray-800 px-2 py-4">
+      <div className="bg-[#bc4749] px-2 py-4">
         <h1 className="pl-2 font-bold text-sm w-[50%] text-white">
           The Coin Game
         </h1>

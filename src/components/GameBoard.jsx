@@ -16,8 +16,8 @@ const BATCH_SIZE = {
 const NEXT_BTN_TEXT = "Move Turn to Next Player";
 const TdStyle = {
   ThStyle: `truncatew-1/6 min-w-[100px] border-l border-transparent py-4 px-2 text-lg font-medium text-white`,
-  TdStyle: `truncate text-dark border-b border-l border-[#E8E8E8] bg-gray-100 dark:bg-dark-3 dark:border-dark dark:text-dark-7 py-4 px-2 text-center text-base font-medium`,
-  TdStyle2: `truncate text-dark border-b border-l border-r border-[#E8E8E8] bg-white dark:border-dark dark:bg-dark-2 dark:text-dark-7 py-5 px-2 text-center text-base font-medium`,
+  TdStyle: `truncate text-dark border-b border-l border-[#E8E8E8] bg-gray-200 py-4 px-2 text-center text-base font-medium`,
+  TdStyle2: `truncate text-dark border-b border-l border-r border-[#E8E8E8] bg-white py-5 px-2 text-center text-base font-medium`,
   TdButton: `truncate inline-block px-6 py-2.5 border rounded-md border-primary text-primary hover:bg-primary hover:text-white font-medium`,
 };
 
@@ -31,6 +31,7 @@ const GameBoard = () => {
   const roomId = searchParams.get("roomId");
   const isFaciliator = searchParams.get("f") === "me";
   // Players/Game stats
+  const totalSize = 4;
   const [players, setPlayers] = useState([]);
   const [clickedDots, setClickedDots] = useState({});
   const [playerName, setPlayerName] = useState();
@@ -42,12 +43,9 @@ const GameBoard = () => {
     round3: { first: "", total: "" },
     round4: { first: "", total: "" },
   });
-  const [isTimeUpdated, setTimeUpdated] = useState(false);
-  const [startTeamTimer, setStartTeamTimer] = useState(false);
-  const [startTimer, setStartTimer] = useState(false);
   const [isNextTurnEnabled, setNextTurnEnabled] = useState(false);
-  const [isFirstValue, setFirstValue] = useState(false);
   const [completedDots, setCompletedDots] = useState(0);
+  const [isFetchedPlayersTime, setFetchedPlayersTime] = useState(false);
 
   // Fetch team players
   useEffect(() => {
@@ -67,7 +65,7 @@ const GameBoard = () => {
           });
           setPlayers(players);
           setClickedDots(clickedDots);
-          setTimeUpdated(true);
+          setFetchedPlayersTime(true);
         }
       },
     );
@@ -79,52 +77,22 @@ const GameBoard = () => {
 
   useEffect(() => {
     if (socket) {
-      socket.on("team_timer_started", () => {
-        if (!startTimer) {
-          setStartTeamTimer(true);
-        }
-      });
-
       socket.on(
         "next_player_turn",
-        ({
-          teamPlayers,
-          clickedDots,
-          isRoundCompleted,
-          isLastPlayer,
-          isNextEnabled,
-        }) => {
-          console.log("next_player_turn >>>", {
-            isRoundCompleted,
-            isLastPlayer,
-            isNextEnabled,
-          });
+        ({ teamPlayers, clickedDots, roundCompleted, isLastPlayer }) => {
           setPlayers(teamPlayers);
           setClickedDots(clickedDots);
-          setNextTurnEnabled(isNextEnabled);
-          if (isRoundCompleted) {
-            setStartTeamTimer(false);
+          if (roundCompleted) {
             setCompletedDots(4);
-          } else {
-            if (!isFirstValue && isLastPlayer) {
-              setFirstValue(true);
-            }
-            if (isLastPlayer) {
-              const dots = Math.min(completedDots + batchSize, 4);
-              console.log({ completedDots, dots });
-              setCompletedDots(dots);
-            }
+          } else if (isLastPlayer) {
+            const dots = Math.min(completedDots + batchSize, 4);
+            setCompletedDots(dots);
           }
         },
       );
 
-      socket.on("manage_next_turn", ({ isNextEnabled, isAllClicked }) => {
+      socket.on("manage_next_turn", ({ isNextEnabled }) => {
         setNextTurnEnabled(isNextEnabled);
-        if (!isAllClicked) {
-          setStartTimer(true);
-        } else {
-          setStartTimer(false);
-        }
       });
 
       socket.on("set_players_time", ({ playersTime }) => {
@@ -149,7 +117,6 @@ const GameBoard = () => {
       setBatchSize(BATCH_SIZE[nextRound]);
       setCompletedDots(0);
       setNextTurnEnabled(false);
-      setFirstValue(false);
     });
     return () => {
       socket.off("start_new_round");
@@ -158,12 +125,12 @@ const GameBoard = () => {
 
   // Fetch Players Time
   useEffect(() => {
-    if (isTimeUpdated) {
-      const data = { playersTime, roomId, teamId };
+    if (isFetchedPlayersTime) {
+      setFetchedPlayersTime(false);
+      const data = { playersTime, teamId };
       socket.emit("fetch_players_time", data);
-      setTimeUpdated(false);
     }
-  }, [isTimeUpdated, playersTime, roomId, teamId]);
+  }, [playersTime, teamId, isFetchedPlayersTime]);
 
   // Cookie
   useEffect(() => {
@@ -176,19 +143,17 @@ const GameBoard = () => {
   }, []);
 
   const moveToNextPlayer = (playerId) => {
-    console.log("check_for_next_turn >>>");
     socket.emit("check_for_next_turn", {
       playerId,
       teamId,
       round,
       batchSize,
-      totalBatchSize: 4,
+      totalSize,
     });
   };
 
   const startNewRound = (nextRound) => {
     if (completedDots >= 4) {
-      console.log("check_for_new_round >>>");
       socket.emit("check_for_new_round", { round, nextRound, teamId });
     }
   };
@@ -218,23 +183,17 @@ const GameBoard = () => {
           };
         }
       });
-      if (seconds !== 0 && miliSeconds !== 0) {
-        setTimeUpdated(true);
-      }
+      setFetchedPlayersTime(true);
     }
   };
 
-  const handleTeamTime = (seconds, miliSeconds) => {
+  const handleTeamTime = (seconds, miliSeconds, isFirstValue) => {
     if (isFirstValue) {
       playersTime[round]["first"] = `${seconds}.${miliSeconds}`;
-      setTimeUpdated(true);
     } else if (seconds !== 0 && miliSeconds !== 0) {
       playersTime[round]["total"] = `${seconds}.${miliSeconds}`;
-      if (round === "round1") {
-        playersTime[round]["first"] = `${seconds}.${miliSeconds}`;
-      }
-      setTimeUpdated(true);
     }
+    setFetchedPlayersTime(true);
   };
 
   const generateDot = (dotIndex, playerId, clickedDots) => {
@@ -248,6 +207,7 @@ const GameBoard = () => {
         socket={socket}
         clickedDots={clickedDots}
         batchSize={batchSize}
+        totalSize={totalSize}
       />
     );
   };
@@ -275,7 +235,7 @@ const GameBoard = () => {
                   }}
                 >
                   <div className="flex gap-x-2 items-center justify-between">
-                    <div className="flex items-center bg-green-100 text-green-800 rounded-md whitespace-nowrap text-center leading-none p-2">
+                    <div className="flex items-center bg-gray-200 text-gray-700 rounded-md whitespace-nowrap text-center leading-none p-2">
                       <Icons.user className="mr-2 h-4 w-4" />
                       {p.name}
                       {p.name === playerName ? "  (Me)" : ""}
@@ -323,8 +283,8 @@ const GameBoard = () => {
               );
             })
           : ""}
-        <div className="flex flex-col bg-white border-2 rounded-md p-2 mx-3 min-h-[200px]">
-          <div className="flex items-center bg-green-100 text-green-800 rounded-md whitespace-nowrap text-center leading-none p-2">
+        <div className="flex flex-col bg-white ring-2 ring-green-300 rounded-md p-2 mx-3 min-h-[200px]">
+          <div className="flex items-center justify-center font-bold text-md text-gray-700 whitespace-nowrap p-2">
             Customer
           </div>
           <div className={clsx("flex items-center flex-wrap w-100 my-3", {})}>
@@ -340,17 +300,8 @@ const GameBoard = () => {
       </div>
       <div className="flex flex-col gap-6 w-full md:w-[85%] lg:w-[70%] xl:w-[35%] 2xl:w-[40%] my-5">
         <div className="flex justify-around gap-2 mx-3">
-          <PlayerTimer
-            startTimer={startTimer}
-            handlePlayerTime={handlePlayerTime}
-            round={round}
-          />
-          <TeamTimer
-            startTimer={startTeamTimer}
-            handleTeamTime={handleTeamTime}
-            isFirstValue={isFirstValue}
-            round={round}
-          />
+          <PlayerTimer handlePlayerTime={handlePlayerTime} socket={socket} />
+          <TeamTimer handleTeamTime={handleTeamTime} socket={socket} />
         </div>
         <section className="bg-white dark:bg-dark mx-3">
           <div className="container">

@@ -9,12 +9,13 @@ const Dot = ({
   socket,
   clickedDots,
   batchSize,
+  totalSize,
 }) => {
   const [clicked, setClicked] = useState(false);
-  const [isAnyDotClicked, setDotClicked] = useState(false);
 
   useEffect(() => {
     const data = clickedDots.find((obj) => obj.playerId === playerId);
+    console.log({ playerId }, { data }, { dotIndex });
     if (data !== null && data !== undefined) {
       if (data["clicked_dots"][round].includes(dotIndex)) {
         console.log("selected Index >>> ", dotIndex);
@@ -26,32 +27,28 @@ const Dot = ({
   }, [round, clickedDots, dotIndex, playerId]);
 
   useEffect(() => {
-    socket.on("dot_clicked_update", ({ teamData, playerId }) => {
+    socket.on("dot_clicked_update", ({ teamData }) => {
       const player = teamData.find((obj) => obj.playerId === playerId);
       const clickedDots = player["clicked_dots"][round];
-      console.log("dot_clicked_update >>> ", { clickedDots }, { dotIndex });
+      // console.log("dot_clicked_update >>> ", { clickedDots }, { dotIndex });
       if (clickedDots.includes(dotIndex)) {
         setClicked(true);
       } else {
         setClicked(false);
       }
     });
-  }, [socket, dotIndex]);
+  }, [socket, round, dotIndex, playerId]);
 
   const handleClick = () => {
-    console.log("dot clicked >>> ", dotIndex);
+    // console.log("dot clicked >>> ", dotIndex);
     socket.emit("dot_clicked", {
       playerId,
       teamId,
-      roomId,
       dotIndex,
       round,
       batchSize,
+      totalSize,
     });
-    if (!isAnyDotClicked) {
-      setDotClicked(true);
-      socket.emit("start_team_timer", { roomId, teamId });
-    }
   };
 
   return (

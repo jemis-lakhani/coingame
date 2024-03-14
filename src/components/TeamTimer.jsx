@@ -1,9 +1,21 @@
 import { useEffect, useState } from "react";
 
-const TeamTimer = ({ startTimer, handleTeamTime, isFirstValue, round }) => {
+const TeamTimer = ({ socket, handleTeamTime }) => {
   const [seconds, setSeconds] = useState(0);
   const [miliSeconds, setMiliSeconds] = useState(0);
-  const [firstCalled, setFirstCalled] = useState(false);
+  const [startTimer, setStartTimer] = useState(false);
+  const [isFirstValue, setFirstValue] = useState(false);
+
+  useEffect(() => {
+    socket.on("manage_team_timer", ({ start, isFirstValue, isReset }) => {
+      if (isReset) {
+        setSeconds(0);
+        setMiliSeconds(0);
+      }
+      setStartTimer(start);
+      setFirstValue(isFirstValue);
+    });
+  }, [socket]);
 
   useEffect(() => {
     let secondInterval;
@@ -15,16 +27,18 @@ const TeamTimer = ({ startTimer, handleTeamTime, isFirstValue, round }) => {
       }, 1000);
 
       miliSecondInterval = setInterval(() => {
-        setMiliSeconds((prevSeconds) => {
-          if (prevSeconds >= 999) {
+        setMiliSeconds((prevMiliSeconds) => {
+          if (prevMiliSeconds >= 100) {
             return 0;
           } else {
-            return prevSeconds + 1;
+            return prevMiliSeconds + 1;
           }
         });
-      }, 1);
+      }, 15);
     } else {
-      handleTeamTime(seconds, miliSeconds);
+      handleTeamTime(seconds, miliSeconds, isFirstValue);
+      clearInterval(secondInterval);
+      clearInterval(miliSecondInterval);
     }
 
     return () => {
@@ -34,33 +48,24 @@ const TeamTimer = ({ startTimer, handleTeamTime, isFirstValue, round }) => {
   }, [startTimer]);
 
   useEffect(() => {
-    if (isFirstValue && !firstCalled) {
-      setFirstCalled(true);
-      handleTeamTime(seconds, miliSeconds);
+    if (isFirstValue) {
+      handleTeamTime(seconds, miliSeconds, isFirstValue);
+      setFirstValue(false);
     }
   }, [isFirstValue]);
-
-  useEffect(() => {
-    setSeconds(0);
-    setMiliSeconds(0);
-  }, [round]);
 
   return (
     <div className="p-2">
       <div className="flex flex-col items-center justify-start gap-1 sm:gap-4">
         <span className="text-black">Team Time</span>
         <div className="flex gap-1 sm:gap-4">
-          <div className="flex justify-between items-center h-16 w-16 sm:w-12 sm:h-12 lg:w-16 lg:h-14 bg-gray-800 rounded-lg">
-            <div className="relative h-2.5 w-2.5 sm:h-3 sm:w-3 !-left-[6px] rounded-full bg-white"></div>
+          <div className="h-12 w-12 sm:w-12 sm:h-12 lg:w-16 lg:h-16 flex justify-center items-center bg-gray-800 rounded-lg">
             <span className="text-2xl font-semibold text-white">{seconds}</span>
-            <div className="relative h-2.5 w-2.5 sm:h-3 sm:w-3 -right-[6px] rounded-full bg-white"></div>
           </div>
-          <div className="flex justify-between items-center h-16 w-16 sm:w-12 sm:h-12 lg:w-16 lg:h-14 bg-gray-800 rounded-lg">
-            <div className="relative h-2.5 w-2.5 sm:h-3 sm:w-3 !-left-[6px] rounded-full bg-white"></div>
+          <div className="h-12 w-12 sm:w-12 sm:h-12 lg:w-16 lg:h-16 flex justify-center items-center bg-gray-800 rounded-lg">
             <span className="text-2xl font-semibold text-white">
               {miliSeconds}
             </span>
-            <div className="relative h-2.5 w-2.5 sm:h-3 sm:w-3 -right-[6px] rounded-full bg-white"></div>
           </div>
         </div>
       </div>

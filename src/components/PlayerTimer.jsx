@@ -1,8 +1,19 @@
 import { useEffect, useState } from "react";
 
-const PlayerTimer = ({ startTimer, handlePlayerTime, round }) => {
+const PlayerTimer = ({ socket, handlePlayerTime }) => {
   const [seconds, setSeconds] = useState(0);
   const [miliSeconds, setMiliSeconds] = useState(0);
+  const [startTimer, setStartTimer] = useState(false);
+
+  useEffect(() => {
+    socket.on("manage_player_timer", ({ start, isReset }) => {
+      if (isReset) {
+        setSeconds(0);
+        setMiliSeconds(0);
+      }
+      setStartTimer(start);
+    });
+  }, [socket]);
 
   useEffect(() => {
     let secondInterval;
@@ -14,16 +25,18 @@ const PlayerTimer = ({ startTimer, handlePlayerTime, round }) => {
       }, 1000);
 
       miliSecondInterval = setInterval(() => {
-        setMiliSeconds((prevSeconds) => {
-          if (prevSeconds >= 999) {
+        setMiliSeconds((prevMiliSeconds) => {
+          if (prevMiliSeconds >= 100) {
             return 0;
           } else {
-            return prevSeconds + 1;
+            return prevMiliSeconds + 1;
           }
         });
-      }, 1);
+      }, 15);
     } else {
       handlePlayerTime(seconds, miliSeconds);
+      clearInterval(secondInterval);
+      clearInterval(miliSecondInterval);
     }
 
     return () => {
@@ -32,28 +45,18 @@ const PlayerTimer = ({ startTimer, handlePlayerTime, round }) => {
     };
   }, [startTimer]);
 
-  useEffect(() => {
-    console.log("Round >>> ", round);
-    setSeconds(0);
-    setMiliSeconds(0);
-  }, [round]);
-
   return (
     <div className="p-2">
       <div className="flex flex-col items-center justify-start gap-1 sm:gap-4">
         <span className="text-black">Your Time</span>
         <div className="relative flex justify-center gap-1 sm:gap-4">
-          <div className="h-16 w-16 sm:w-12 sm:h-12 lg:w-16 lg:h-14 flex justify-between items-center bg-gray-800 rounded-lg">
-            <div className="relative h-2.5 w-2.5 sm:h-3 sm:w-3 !-left-[6px] rounded-full bg-white"></div>
+          <div className="h-12 w-12 sm:w-12 sm:h-12 lg:w-16 lg:h-16 flex justify-center items-center bg-gray-800 rounded-lg">
             <span className="text-2xl font-semibold text-white">{seconds}</span>
-            <div className="relative h-2.5 w-2.5 sm:h-3 sm:w-3 -right-[6px] rounded-full bg-white"></div>
           </div>
-          <div className="h-16 w-16 sm:w-12 sm:h-12 lg:w-16 lg:h-14 flex justify-between items-center bg-gray-800 rounded-lg">
-            <div className="relative h-2.5 w-2.5 sm:h-3 sm:w-3 !-left-[6px] rounded-full bg-white"></div>
+          <div className="h-12 w-12 sm:w-12 sm:h-12 lg:w-16 lg:h-16 flex justify-center items-center bg-gray-800 rounded-lg">
             <span className="text-2xl font-semibold text-white">
               {miliSeconds}
             </span>
-            <div className="relative h-2.5 w-2.5 sm:h-3 sm:w-3 -right-[6px] rounded-full bg-white"></div>
           </div>
         </div>
       </div>

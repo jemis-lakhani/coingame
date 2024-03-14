@@ -3,7 +3,7 @@ import React from "react";
 function Footer() {
   return (
     <footer className="w-full">
-      <div className="bg-gray-800 px-2 py-4">
+      <div className="bg-[#bc4749] px-2 py-4">
         <h1 className="pl-2 text-sm font-semibold w-[50%] text-white">
           Copyright @ 2024
         </h1>

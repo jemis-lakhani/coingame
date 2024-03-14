@@ -102,14 +102,14 @@ function WaitingRoom() {
       }
     });
 
-    // const player = document.cookie
-    //   .split("; ")
-    //   .find((cookie) => cookie.startsWith("randomRoom1234"));
-    // if (player) {
-    //   setRegisteredName(player.replace("randomRoom1234", ""));
-    // }
+    const player = document.cookie
+      .split("; ")
+      .find((cookie) => cookie.startsWith("randomRoom1234"));
+    if (player) {
+      setRegisteredName(player.replace("randomRoom1234", ""));
+    }
 
-    deleteCookie("randomRoom1234");
+    // deleteCookie("randomRoom1234");
 
     return () => {
       socket.off("join_room");
@@ -141,7 +141,7 @@ function WaitingRoom() {
     <>
       {!isRoomCreated && !registeredName && (
         <div
-          className="flex flex-col gap-6 m-auto py-8 mt-[50px] w-[450px] p-2 rounded-md bg-gray-100"
+          className="flex flex-col gap-6 m-auto py-8 w-[450px] p-2 rounded-md bg-gray-100"
           style={{
             boxShadow: "rgba(0, 0, 0, 0.24) 0px 3px 8px",
           }}
