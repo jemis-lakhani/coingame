@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 
-const TeamTimer = ({ startTimer }) => {
+const TeamTimer = ({ startTimer, handleTeamTime, isFirstValue, round }) => {
   const [seconds, setSeconds] = useState(0);
   const [miliSeconds, setMiliSeconds] = useState(0);
+  const [firstCalled, setFirstCalled] = useState(false);
 
   useEffect(() => {
     let secondInterval;
@@ -22,6 +23,8 @@ const TeamTimer = ({ startTimer }) => {
           }
         });
       }, 1);
+    } else {
+      handleTeamTime(seconds, miliSeconds);
     }
 
     return () => {
@@ -29,6 +32,18 @@ const TeamTimer = ({ startTimer }) => {
       clearInterval(miliSecondInterval);
     };
   }, [startTimer]);
+
+  useEffect(() => {
+    if (isFirstValue && !firstCalled) {
+      setFirstCalled(true);
+      handleTeamTime(seconds, miliSeconds);
+    }
+  }, [isFirstValue]);
+
+  useEffect(() => {
+    setSeconds(0);
+    setMiliSeconds(0);
+  }, [round]);
 
   return (
     <div className="p-2">

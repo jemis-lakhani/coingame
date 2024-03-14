@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const PlayerTimer = ({ startTimer, handlePlayerTime }) => {
+const PlayerTimer = ({ startTimer, handlePlayerTime, round }) => {
   const [seconds, setSeconds] = useState(0);
   const [miliSeconds, setMiliSeconds] = useState(0);
 
@@ -31,6 +31,12 @@ const PlayerTimer = ({ startTimer, handlePlayerTime }) => {
       clearInterval(miliSecondInterval);
     };
   }, [startTimer]);
+
+  useEffect(() => {
+    console.log("Round >>> ", round);
+    setSeconds(0);
+    setMiliSeconds(0);
+  }, [round]);
 
   return (
     <div className="p-2">

@@ -7,9 +7,13 @@ import TeamTimer from "./TeamTimer";
 import PlayerTimer from "./PlayerTimer";
 import { Icons } from "./Icons";
 
-const ROUND = ["round1", "round2", "round3", "round3"];
+const BATCH_SIZE = {
+  round1: 4,
+  round2: 2,
+  round3: 2,
+  round4: 1,
+};
 const NEXT_BTN_TEXT = "Move Turn to Next Player";
-const NEXT_ROUND_TXT = "Start New Round";
 const TdStyle = {
   ThStyle: `truncatew-1/6 min-w-[100px] border-l border-transparent py-4 px-2 text-lg font-medium text-white`,
   TdStyle: `truncate text-dark border-b border-l border-[#E8E8E8] bg-gray-100 dark:bg-dark-3 dark:border-dark dark:text-dark-7 py-4 px-2 text-center text-base font-medium`,
@@ -28,41 +32,53 @@ const GameBoard = () => {
   const isFaciliator = searchParams.get("f") === "me";
   // Players/Game stats
   const [players, setPlayers] = useState([]);
-  const [playerName, setPlayerName] = useState();
   const [clickedDots, setClickedDots] = useState({});
+  const [playerName, setPlayerName] = useState();
   const [batchSize, setBatchSize] = useState(4);
   const [round, setRound] = useState("round1");
-  const [playersTime, setPlayersTime] = useState({});
+  const [playersTime, setPlayersTime] = useState({
+    round1: { first: "", total: "" },
+    round2: { first: "", total: "" },
+    round3: { first: "", total: "" },
+    round4: { first: "", total: "" },
+  });
   const [isTimeUpdated, setTimeUpdated] = useState(false);
   const [startTeamTimer, setStartTeamTimer] = useState(false);
   const [startTimer, setStartTimer] = useState(false);
   const [isNextTurnEnabled, setNextTurnEnabled] = useState(false);
-  const [isRoundCompleted, setRoundCompleted] = useState(false);
+  const [isFirstValue, setFirstValue] = useState(false);
   const [completedDots, setCompletedDots] = useState(0);
-  const [isLastPlayer, setLastPlayer] = useState(false);
 
+  // Fetch team players
   useEffect(() => {
     if (socket) {
       socket.emit("fetch_team_players", { teamId, roomId, round });
     }
   }, []);
 
+  // Set Team Players
+  useEffect(() => {
+    socket.on(
+      "team_players",
+      ({ roomId: rId, teamId: tId, players, clickedDots }) => {
+        if (roomId === rId && teamId === tId) {
+          players.forEach((p) => {
+            updatePlayerTime(p.name);
+          });
+          setPlayers(players);
+          setClickedDots(clickedDots);
+          setTimeUpdated(true);
+        }
+      },
+    );
+
+    return () => {
+      socket.off("team_players");
+    };
+  }, []);
+
   useEffect(() => {
     if (socket) {
-      socket.on(
-        "team_players",
-        ({ roomId: rId, teamId: tId, players, clickedDots }) => {
-          if (roomId === rId && teamId === tId) {
-            setPlayers(players);
-            setClickedDots(clickedDots);
-            players.forEach((p) => {
-              updatePlayerTime(p.name);
-            });
-            setTimeUpdated(true);
-          }
-        },
-      );
-
       socket.on("team_timer_started", () => {
         if (!startTimer) {
           setStartTeamTimer(true);
@@ -76,43 +92,39 @@ const GameBoard = () => {
           clickedDots,
           isRoundCompleted,
           isLastPlayer,
-          completedDots,
+          isNextEnabled,
         }) => {
-          console.log({ clickedDots });
-          console.log({ teamPlayers });
-          setLastPlayer(isLastPlayer);
+          console.log("next_player_turn >>>", {
+            isRoundCompleted,
+            isLastPlayer,
+            isNextEnabled,
+          });
+          setPlayers(teamPlayers);
+          setClickedDots(clickedDots);
+          setNextTurnEnabled(isNextEnabled);
           if (isRoundCompleted) {
-            setRoundCompleted(true);
             setStartTeamTimer(false);
-            const currentIndex = ROUND.indexOf("round1");
-            if (currentIndex !== -1) {
-              const nextRound = ROUND[currentIndex + 1];
-              setRound(nextRound);
-            }
+            setCompletedDots(4);
           } else {
-            setPlayers(teamPlayers);
-            setClickedDots(clickedDots);
+            if (!isFirstValue && isLastPlayer) {
+              setFirstValue(true);
+            }
+            if (isLastPlayer) {
+              const dots = Math.min(completedDots + batchSize, 4);
+              console.log({ completedDots, dots });
+              setCompletedDots(dots);
+            }
           }
         },
       );
 
       socket.on("manage_next_turn", ({ isNextEnabled, isAllClicked }) => {
-        console.log({ isNextEnabled });
-        console.log({ isAllClicked });
         setNextTurnEnabled(isNextEnabled);
-        if (!isAllClicked && !startTimer) {
+        if (!isAllClicked) {
           setStartTimer(true);
         } else {
           setStartTimer(false);
         }
-      });
-
-      socket.on("start_new_round", ({ players, clickedDots, batchSize }) => {
-        console.log({ players });
-        console.log({ clickedDots });
-        setClickedDots(clickedDots);
-        setPlayers(players);
-        setBatchSize(batchSize);
       });
 
       socket.on("set_players_time", ({ playersTime }) => {
@@ -120,22 +132,66 @@ const GameBoard = () => {
       });
 
       return () => {
-        socket.off("team_players");
         socket.off("team_timer_started");
         socket.off("next_player_turn");
         socket.off("set_players_time");
-        socket.off("start_new_round");
+        socket.off("manage_next_turn");
       };
     }
-  }, [socket]);
+  }, [socket, batchSize, completedDots]);
 
+  // New Round
+  useEffect(() => {
+    socket.on("start_new_round", ({ players, clickedDots, nextRound }) => {
+      setRound(nextRound);
+      setClickedDots(clickedDots);
+      setPlayers(players);
+      setBatchSize(BATCH_SIZE[nextRound]);
+      setCompletedDots(0);
+      setNextTurnEnabled(false);
+      setFirstValue(false);
+    });
+    return () => {
+      socket.off("start_new_round");
+    };
+  }, [socket, batchSize]);
+
+  // Fetch Players Time
   useEffect(() => {
     if (isTimeUpdated) {
       const data = { playersTime, roomId, teamId };
       socket.emit("fetch_players_time", data);
       setTimeUpdated(false);
     }
-  }, [isTimeUpdated]);
+  }, [isTimeUpdated, playersTime, roomId, teamId]);
+
+  // Cookie
+  useEffect(() => {
+    const player = document.cookie
+      .split("; ")
+      .find((cookie) => cookie.startsWith("randomRoom1234"));
+    if (player) {
+      setPlayerName(player.replace("randomRoom1234=", ""));
+    }
+  }, []);
+
+  const moveToNextPlayer = (playerId) => {
+    console.log("check_for_next_turn >>>");
+    socket.emit("check_for_next_turn", {
+      playerId,
+      teamId,
+      round,
+      batchSize,
+      totalBatchSize: 4,
+    });
+  };
+
+  const startNewRound = (nextRound) => {
+    if (completedDots >= 4) {
+      console.log("check_for_new_round >>>");
+      socket.emit("check_for_new_round", { round, nextRound, teamId });
+    }
+  };
 
   const updatePlayerTime = (playerName) => {
     setPlayersTime((prevState) => ({
@@ -168,14 +224,18 @@ const GameBoard = () => {
     }
   };
 
-  useEffect(() => {
-    const player = document.cookie
-      .split("; ")
-      .find((cookie) => cookie.startsWith("randomRoom1234"));
-    if (player) {
-      setPlayerName(player.replace("randomRoom1234=", ""));
+  const handleTeamTime = (seconds, miliSeconds) => {
+    if (isFirstValue) {
+      playersTime[round]["first"] = `${seconds}.${miliSeconds}`;
+      setTimeUpdated(true);
+    } else if (seconds !== 0 && miliSeconds !== 0) {
+      playersTime[round]["total"] = `${seconds}.${miliSeconds}`;
+      if (round === "round1") {
+        playersTime[round]["first"] = `${seconds}.${miliSeconds}`;
+      }
+      setTimeUpdated(true);
     }
-  }, []);
+  };
 
   const generateDot = (dotIndex, playerId, clickedDots) => {
     return (
@@ -190,20 +250,6 @@ const GameBoard = () => {
         batchSize={batchSize}
       />
     );
-  };
-
-  const moveToNextPlayer = (playerId) => {
-    socket.emit("check_for_next_turn", {
-      playerId,
-      teamId,
-      roomId,
-      batchSize,
-      round,
-    });
-  };
-
-  const startNewRound = () => {
-    socket.emit("check_for_new_round", { round, teamId });
   };
 
   return (
@@ -222,8 +268,6 @@ const GameBoard = () => {
                     "flex flex-col bg-white border-2 rounded-md p-2 mx-3 min-h-[200px]",
                     {
                       "pointer-events-none": p.name !== playerName,
-                      "ring-2 ring-green-600":
-                        p.name === playerName && !p[round],
                     },
                   )}
                   style={{
@@ -245,10 +289,13 @@ const GameBoard = () => {
                     )}
                   </div>
                   <div
-                    className={clsx("flex items-center flex-wrap w-100 my-3", {
-                      visible: p.isCurrentPlayer,
-                      invisible: !p.isCurrentPlayer,
-                    })}
+                    className={clsx(
+                      "flex items-center flex-wrap w-100 my-auto",
+                      {
+                        visible: p.isCurrentPlayer,
+                        invisible: !p.isCurrentPlayer,
+                      },
+                    )}
                   >
                     {loopArray.map((item, loopIndex) => {
                       const index = loopIndex + p.startIndex;
@@ -281,12 +328,13 @@ const GameBoard = () => {
             Customer
           </div>
           <div className={clsx("flex items-center flex-wrap w-100 my-3", {})}>
-            {Array.from({ length: completedDots }).map((_, index) => (
-              <div
-                key={index}
-                className={`h-12 w-12 bg-white rounded-full cursor-none`}
-              ></div>
-            ))}
+            {completedDots > 0 &&
+              Array.from({ length: completedDots }).map((_, index) => (
+                <div
+                  key={index}
+                  className={`h-12 w-12 mr-2 bg-gray-300 rounded-full cursor-none`}
+                ></div>
+              ))}
           </div>
         </div>
       </div>
@@ -295,8 +343,14 @@ const GameBoard = () => {
           <PlayerTimer
             startTimer={startTimer}
             handlePlayerTime={handlePlayerTime}
+            round={round}
           />
-          <TeamTimer startTimer={startTeamTimer} />
+          <TeamTimer
+            startTimer={startTeamTimer}
+            handleTeamTime={handleTeamTime}
+            isFirstValue={isFirstValue}
+            round={round}
+          />
         </div>
         <section className="bg-white dark:bg-dark mx-3">
           <div className="container">
@@ -307,34 +361,27 @@ const GameBoard = () => {
                     <thead className="text-center bg-gray-800">
                       <tr>
                         <th className={TdStyle.ThStyle}> Player </th>
+                        <th className={TdStyle.ThStyle}>Round1</th>
                         <th className={TdStyle.ThStyle}>
                           <button
                             disabled={"round1" !== round || !isFaciliator}
-                            onClick={() => startNewRound()}
-                          >
-                            Round1
-                          </button>
-                        </th>
-                        <th className={TdStyle.ThStyle}>
-                          <button
-                            disabled={"round2" !== round || !isFaciliator}
-                            onClick={() => startNewRound()}
+                            onClick={() => startNewRound("round2")}
                           >
                             Round2
                           </button>
                         </th>
                         <th className={TdStyle.ThStyle}>
                           <button
-                            disabled={"round3" !== round || !isFaciliator}
-                            onClick={() => startNewRound()}
+                            disabled={"round2" !== round || !isFaciliator}
+                            onClick={() => startNewRound("round3")}
                           >
                             Round3
                           </button>
                         </th>
                         <th className={TdStyle.ThStyle}>
                           <button
-                            disabled={"round4" !== round || !isFaciliator}
-                            onClick={() => startNewRound()}
+                            disabled={"round3" !== round || !isFaciliator}
+                            onClick={() => startNewRound("round4")}
                           >
                             Round4
                           </button>
@@ -364,6 +411,36 @@ const GameBoard = () => {
                             </tr>
                           );
                         })}
+                      <tr>
+                        <td className={TdStyle.TdStyle}>First Value</td>
+                        <td className={TdStyle.TdStyle2}>
+                          {playersTime["round1"]["first"]}
+                        </td>
+                        <td className={TdStyle.TdStyle2}>
+                          {playersTime["round2"]["first"]}
+                        </td>
+                        <td className={TdStyle.TdStyle2}>
+                          {playersTime["round3"]["first"]}
+                        </td>
+                        <td className={TdStyle.TdStyle2}>
+                          {playersTime["round4"]["first"]}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className={TdStyle.TdStyle}>Total</td>
+                        <td className={TdStyle.TdStyle2}>
+                          {playersTime["round1"]["total"]}
+                        </td>
+                        <td className={TdStyle.TdStyle2}>
+                          {playersTime["round2"]["total"]}
+                        </td>
+                        <td className={TdStyle.TdStyle2}>
+                          {playersTime["round3"]["total"]}
+                        </td>
+                        <td className={TdStyle.TdStyle2}>
+                          {playersTime["round4"]["total"]}
+                        </td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>
