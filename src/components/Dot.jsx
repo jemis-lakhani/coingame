@@ -15,10 +15,8 @@ const Dot = ({
 
   useEffect(() => {
     const data = clickedDots.find((obj) => obj.playerId === playerId);
-    console.log({ playerId }, { data }, { dotIndex });
     if (data !== null && data !== undefined) {
       if (data["clicked_dots"][round].includes(dotIndex)) {
-        console.log("selected Index >>> ", dotIndex);
         setClicked(true);
       } else {
         setClicked(false);
@@ -30,7 +28,6 @@ const Dot = ({
     socket.on("dot_clicked_update", ({ teamData }) => {
       const player = teamData.find((obj) => obj.playerId === playerId);
       const clickedDots = player["clicked_dots"][round];
-      // console.log("dot_clicked_update >>> ", { clickedDots }, { dotIndex });
       if (clickedDots.includes(dotIndex)) {
         setClicked(true);
       } else {
@@ -40,7 +37,6 @@ const Dot = ({
   }, [socket, round, dotIndex, playerId]);
 
   const handleClick = () => {
-    // console.log("dot clicked >>> ", dotIndex);
     socket.emit("dot_clicked", {
       playerId,
       teamId,
