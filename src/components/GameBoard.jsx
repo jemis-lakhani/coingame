@@ -165,8 +165,9 @@ const GameBoard = () => {
 
   const startNewRound = () => {
     const nextRound = NEXT_ROUND[round];
+    const newSize = parseInt(newBatchSize);
     if (nextRound === "round3" || nextRound === "round4") {
-      if (newBatchSize > 0 && newBatchSize <= totalSize) {
+      if (newSize > 0 && newSize <= totalSize && totalSize % newSize === 0) {
         setModalError("");
         setShowModal(false);
         if (completedDots >= totalSize) {
@@ -174,7 +175,7 @@ const GameBoard = () => {
             round,
             nextRound,
             teamId,
-            batchSize: newBatchSize,
+            batchSize: newSize,
           });
         }
       } else {

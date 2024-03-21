@@ -31,36 +31,11 @@ function WaitingRoom() {
   const [players, setPlayers] = useState([]);
   const [playersPerTeam, setPlayersPerTeam] = useState(0);
   const [isRoomCreated, setRoomCreated] = useState(false);
+  const [isFacilitator, setFacilitator] = useState(false);
 
-  const startGame = (e) => {
-    e.preventDefault();
-    if (playersPerTeam > 0 && playersPerTeam <= players.length) {
-      const roomId = generateRandomId();
-      const data = { roomId, teamSize: playersPerTeam };
-      socket.emit("start_game", data);
-      return () => {
-        socket.off("start_game");
-      };
-    }
-  };
-
-  const addPlayer = () => {
-    if (playerName && playerName.length) {
-      setPlayerName("");
-      const data = {
-        id: generateUserId(),
-        socketId: socket.id,
-        name: playerName,
-        isRoomCreated: false,
-      };
-      socket.emit("add_player_to_team", data);
-      setRegisteredName(playerName);
-
-      return () => {
-        socket.off("add_player_to_team");
-      };
-    }
-  };
+  useEffect(() => {
+    setFacilitator(paramValue === "me");
+  }, [paramValue]);
 
   useEffect(() => {
     socket.emit("fetch_waiting_room_players");
@@ -109,7 +84,7 @@ function WaitingRoom() {
       setRegisteredName(player.replace("randomRoom1234", ""));
     }
 
-    // deleteCookie("randomRoom1234");
+    deleteCookie("randomRoom1234");
 
     return () => {
       socket.off("join_room");
@@ -117,10 +92,6 @@ function WaitingRoom() {
       socket.off("set_waiting_room_players");
     };
   }, []);
-
-  function deleteCookie(cookieName) {
-    document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-  }
 
   useEffect(() => {
     socket.on("update_player_list", (data) => {
@@ -137,84 +108,114 @@ function WaitingRoom() {
     };
   }, [socket]);
 
+  const startGame = (e) => {
+    e.preventDefault();
+    if (playersPerTeam > 0 && playersPerTeam <= players.length) {
+      const roomId = generateRandomId();
+      const data = { roomId, teamSize: playersPerTeam };
+      socket.emit("start_game", data);
+      return () => {
+        socket.off("start_game");
+      };
+    }
+  };
+
+  const addPlayer = () => {
+    if (playerName && playerName.length) {
+      setPlayerName("");
+      const data = {
+        id: generateUserId(),
+        socketId: socket.id,
+        name: playerName,
+        isRoomCreated: false,
+      };
+      socket.emit("add_player_to_team", data);
+      setRegisteredName(playerName);
+
+      return () => {
+        socket.off("add_player_to_team");
+      };
+    }
+  };
+
+  function deleteCookie(cookieName) {
+    document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+  }
+
   return (
     <>
-      {!isRoomCreated && !registeredName && (
-        <div
-          className="flex flex-col gap-6 m-auto py-8 w-[450px] p-2 rounded-md bg-gray-100"
-          style={{
-            boxShadow: "rgba(0, 0, 0, 0.24) 0px 3px 8px",
-          }}
-        >
-          <h1 className="text-2xl font-bold">
-            Enter your name to join the game
-          </h1>
+      {!isRoomCreated && !registeredName && !isFacilitator && (
+        <div className="flex flex-col gap-6 m-auto p-6 w-[450px] rounded-xl border shadow bg-white">
+          <h3 className="text-xl font-semibold leading-none tracking-tight">
+            Enter your name
+          </h3>
           <input
             value={playerName}
             placeholder="Your name"
             onChange={(e) => setPlayerName(e.target.value)}
-            className="px-3 py-2"
+            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
           />
           <button
-            className="flex items-center justify-center w-full bg-green-500 sm:w-auto rounded-sm px-4 py-2 text-white disabled:opacity-50"
+            className="flex items-center justify-center w-full h-9 font-medium transition-colors bg-green-500 sm:w-auto rounded-md px-4 py-2 text-white disabled:opacity-50"
             onClick={addPlayer}
           >
             Join
           </button>
         </div>
       )}
-      <div
-        className="m-auto"
-        style={{
-          boxShadow: "rgba(0, 0, 0, 0.24) 0px 3px 8px",
-        }}
-      >
-        {!isRoomCreated ? (
-          <>
-            <div className="m-auto w-[450px] p-2 gap-3 flex flex-col rounded-sm bg-gray-200 drop-shadow-md">
-              <h1 className="text-2xl font-bold">
-                Waiting for players to join
-              </h1>
-              <h2>
-                Once the game has started you cannot add more players so please
-                ensure all players are listed below before starting the game.
-              </h2>
-              {paramValue === "me" && (
-                <>
-                  <input
-                    value={playersPerTeam === 0 ? "" : playersPerTeam}
-                    placeholder="Enter players per team"
-                    onChange={(e) => setPlayersPerTeam(e.target.value)}
-                    className="px-3 py-2"
-                  />
-                  <button
-                    onClick={startGame}
-                    type="button"
-                    className="focus:outline-none w-[50%] text-white bg-green-500 hover:bg-green-800 focus:ring-0 font-medium rounded-sm text-sm px-5 py-2.5 me-2 mb-2 "
-                  >
-                    Start Game
-                  </button>
-                </>
-              )}
 
-              <div className="flex flex-col text-lg">
-                {players.length
-                  ? players.map((player, index) => (
-                      <div
-                        key={index}
-                        className="drop-shadow-md px-2 py-1 bg-[white]"
-                      >
-                        {player.name}
-                      </div>
-                    ))
-                  : ""}
-              </div>
+      {!isRoomCreated ? (
+        <>
+          <div className="m-auto w-[450px] p-6 flex flex-col gap-3 rounded-xl border shadow bg-white">
+            <h3 className="text-xl font-semibold leading-none tracking-tight">
+              Players in room
+            </h3>
+            <p className="text-sm text-gray-500 text-muted-foreground">
+              Once the game has started you cannot add more players so please
+              ensure all players are listed above before starting the game.
+            </p>
+
+            <div className="flex flex-row gap-3">
+              {players.length > 0 ? (
+                players.map((player, index) => (
+                  <div
+                    key={index}
+                    className="relative grid select-none items-center whitespace-nowrap rounded-lg bg-gradient-to-tr from-gray-900 to-gray-800 py-1.5 px-3 font-sans text-sm font-bold text-white"
+                  >
+                    <span class="">{player.name}</span>
+                  </div>
+                ))
+              ) : (
+                <span className="flex justify-center bg-gray-900/10 text-gray-900 font-medium py-1.5 px-3 select-none whitespace-nowrap rounded w-full">
+                  Waiting for players to join
+                </span>
+              )}
             </div>
-          </>
-        ) : (
-          ""
-        )}
-      </div>
+
+            {isFacilitator && (
+              <>
+                <input
+                  value={playersPerTeam === 0 ? "" : playersPerTeam}
+                  placeholder="Enter players per team"
+                  onChange={(e) => setPlayersPerTeam(e.target.value)}
+                  className="flex h-9 w-full mt-5 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-inner transition-colors placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-80"
+                  disabled={!(players.length > 0)}
+                />
+                <button
+                  onClick={startGame}
+                  type="button"
+                  className="flex items-center justify-center w-full h-9 font-medium transition-colors bg-green-500 sm:w-auto rounded-md px-4 py-2 text-white disabled:opacity-60"
+                  disabled={!(players.length > 0)}
+                >
+                  Start Game
+                </button>
+              </>
+            )}
+          </div>
+        </>
+      ) : (
+        ""
+      )}
     </>
   );
 }
