@@ -14,8 +14,10 @@ function App() {
         <div className="flex flex-col">
           <Header></Header>
           <div
-            className="flex flex-col gap-1 h-full bg-neutral-100"
-            style={{ height: "calc(100vh - 104px)" }}
+            className="flex flex-col justify-center space-y-10 h-auto bg-neutral-100"
+            style={{
+              minHeight: "calc(100vh - 112px)",
+            }}
           >
             <Router>
               <Routes>

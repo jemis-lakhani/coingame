@@ -1,29 +1,18 @@
 import React, { useEffect, useState } from "react";
 import Dot from "./Dot";
 import io from "socket.io-client";
-import { useAsyncError, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import clsx from "clsx";
 import TeamTimer from "./TeamTimer";
 import PlayerTimer from "./PlayerTimer";
 import { Icons } from "./Icons";
+import { BATCH_SIZE, NEXT_ROUND } from "../context/Constants";
+import Instruction from "./Instruction";
 
-const BATCH_SIZE = {
-  round1: 4,
-  round2: 2,
-  round3: 2,
-  round4: 1,
-};
-const NEXT_ROUND = {
-  round1: "round2",
-  round2: "round3",
-  round3: "round4",
-};
-const NEXT_BTN_TEXT = "Move Turn to Next Player";
 const TdStyle = {
-  ThStyle: `truncatew-1/6 min-w-[100px] border-l border-transparent py-4 px-2 text-lg font-medium text-white`,
-  TdStyle: `truncate text-dark border-b border-l border-[#E8E8E8] bg-gray-200 py-4 px-2 text-center text-base font-medium`,
-  TdStyle2: `truncate text-dark border-b border-l border-r border-[#E8E8E8] bg-white py-5 px-2 text-center text-base font-medium`,
-  TdButton: `truncate inline-block px-6 py-2.5 border rounded-md border-primary text-primary hover:bg-primary hover:text-white font-medium`,
+  ThStyle: `truncate text-dark w-1/6 min-w-[100px] bg-gradient-to-tr from-gray-900 to-gray-800 border-transparent p-3 text-lg text-white font-medium `,
+  TdStyle: `truncate text-dark border-l border-gray-300 bg-gray-200 p-3 text-center text-base font-medium`,
+  TdStyle2: `truncate text-dark border-b border-l border-r border-[#E8E8E8] bg-white p-3 text-center text-base font-medium`,
 };
 
 const socket = io.connect("http://localhost:5000");
@@ -35,11 +24,11 @@ const GameBoard = () => {
   const teamId = searchParams.get("teamId");
   const roomId = searchParams.get("roomId");
   // Players/Game stats
-  const totalSize = 4;
+  const totalSize = 20;
   const [players, setPlayers] = useState([]);
   const [clickedDots, setClickedDots] = useState({});
   const [playerName, setPlayerName] = useState();
-  const [batchSize, setBatchSize] = useState(4);
+  const [batchSize, setBatchSize] = useState(20);
   const [newBatchSize, setNewBatchSize] = useState();
   const [round, setRound] = useState("round1");
   const [isFirstPlayer, setFirstPlayer] = useState(false);
@@ -64,25 +53,43 @@ const GameBoard = () => {
       setPlayerName(player.replace("randomRoom1234=", ""));
     }
     if (socket) {
-      socket.emit("fetch_team_players", { teamId, roomId, round });
+      socket.emit("fetch_team_players", { teamId, roomId });
     }
   }, []);
 
   // Set Team Players
   useEffect(() => {
+    socket.on("restart_game", () => {
+      window.location.reload();
+    });
+
     socket.on(
       "team_players",
       ({ roomId: rId, teamId: tId, players, clickedDots }) => {
-        if (roomId === rId && teamId === tId) {
+        if (
+          parseInt(roomId) === parseInt(rId) &&
+          parseInt(teamId) === parseInt(tId)
+        ) {
+          const time = playersTime;
+          let isFirstPlayer = false;
           players.forEach((p) => {
-            updatePlayerTime(p.name);
+            time[p.name] = {
+              round1: "",
+              round2: "",
+              round3: "",
+              round4: "",
+            };
             if (playerName === p.name) {
               setFirstPlayer(p.isFirstPlayer);
+              isFirstPlayer = p.isFirstPlayer;
             }
           });
           setPlayers(players);
           setClickedDots(clickedDots);
-          setFetchedPlayersTime(true);
+          if (isFirstPlayer) {
+            const data = { playersTime: time, teamId };
+            socket.emit("fetch_players_time", data);
+          }
         }
       },
     );
@@ -90,7 +97,7 @@ const GameBoard = () => {
     return () => {
       socket.off("team_players");
     };
-  }, [playerName]);
+  }, [socket, playerName]);
 
   useEffect(() => {
     if (socket) {
@@ -153,7 +160,6 @@ const GameBoard = () => {
   }, [playersTime, teamId, isFetchedPlayersTime]);
 
   const moveToNextPlayer = (playerId) => {
-    console.log({ batchSize }, { round }, { totalSize });
     socket.emit("check_for_next_turn", {
       playerId,
       teamId,
@@ -191,18 +197,6 @@ const GameBoard = () => {
     }
   };
 
-  const updatePlayerTime = (playerName) => {
-    setPlayersTime((prevState) => ({
-      ...prevState,
-      [playerName]: {
-        round1: "",
-        round2: "",
-        round3: "",
-        round4: "",
-      },
-    }));
-  };
-
   const handlePlayerTime = (seconds, miliSeconds) => {
     if (playersTime[playerName]) {
       setPlayersTime((prevState) => {
@@ -229,9 +223,10 @@ const GameBoard = () => {
     setFetchedPlayersTime(true);
   };
 
-  const generateDot = (dotIndex, playerId, clickedDots) => {
+  const generateDot = (index, dotIndex, playerId, clickedDots) => {
     return (
       <Dot
+        playerIndex={index}
         dotIndex={dotIndex}
         teamId={teamId}
         roomId={roomId}
@@ -249,32 +244,33 @@ const GameBoard = () => {
     <>
       <div className="container flex flex-row flex-wrap justify-center gap-8 max-w-[1400px] mx-auto">
         <div className="flex flex-col gap-6 w-full md:w-[85%] lg:w-[70%] xl:w-[50%] 2xl:w-[55%] my-5">
+          <div className="relative grid select-none items-center whitespace-nowrap uppercase rounded-lg bg-gradient-to-tr from-gray-900 to-gray-800 py-1.5 px-3 font-sans text-sm font-bold text-white mx-auto">
+            {round}
+          </div>
           {players && players.length > 0
             ? players.map((p, index) => {
                 let loopArray;
                 if (p.endIndex - p.startIndex >= 0) {
                   loopArray = new Array(p.endIndex - p.startIndex).fill(null);
                 }
+                const selfPlayer = p.name === playerName;
                 return (
                   <div
                     key={index}
                     className={clsx(
-                      "flex flex-col bg-white border-2 rounded-md p-2 mx-3 min-h-[200px]",
+                      "flex flex-col gap-2 rounded-md border shadow-md bg-white p-2 mx-3 min-h-[200px]",
                       {
-                        "pointer-events-none": p.name !== playerName,
+                        "pointer-events-none": !selfPlayer,
                       },
                     )}
-                    style={{
-                      boxShadow: "rgba(0, 0, 0, 0.24) 0px 3px 8px",
-                    }}
                   >
                     <div className="flex gap-x-2 items-center justify-between">
-                      <div className="flex items-center bg-gray-200 text-gray-700 rounded-md whitespace-nowrap text-center leading-none p-2">
+                      <div className="flex items-center bg-gray-200 font-medium rounded-md whitespace-nowrap text-center leading-none p-2">
                         <Icons.user className="mr-2 h-4 w-4" />
                         {p.name}
-                        {p.name === playerName ? "  (Me)" : ""}
+                        {selfPlayer ? "  (Me)" : ""}
                       </div>
-                      {p[round] && (
+                      {p.count >= totalSize && (
                         <div className="p-2 text-xs rounded-md inline-block whitespace-nowrap text-center font-bold uppercase leading-none text-white">
                           <div className="flex justify-start items-center">
                             <Icons.check className="h-6 w-6" />
@@ -292,10 +288,10 @@ const GameBoard = () => {
                       )}
                     >
                       {loopArray.map((item, loopIndex) => {
-                        const index = loopIndex + p.startIndex;
+                        const dotIndex = loopIndex + p.startIndex;
                         return (
-                          <div key={index} className="m-2">
-                            {generateDot(index, p.id, clickedDots)}
+                          <div key={dotIndex} className="m-2">
+                            {generateDot(index, dotIndex, p.id, clickedDots)}
                           </div>
                         );
                       })}
@@ -306,139 +302,137 @@ const GameBoard = () => {
                       className={clsx(
                         "flex items-center justify-center w-full bg-green-500 border-b-0 border-green-700 sm:w-auto rounded-md px-4 py-2 text-white disabled:opacity-50",
                         {
-                          visible: p.name === playerName,
-                          hidden: p.name !== playerName,
+                          visible: selfPlayer,
+                          hidden: !selfPlayer,
                         },
                       )}
                     >
-                      {NEXT_BTN_TEXT}
+                      Move Turn to Next Player
                     </button>
                   </div>
                 );
               })
             : ""}
-          <div className="flex flex-col bg-white ring-2 ring-green-300 rounded-md p-2 mx-3 min-h-[200px]">
-            <div className="flex items-center justify-center font-bold text-md text-gray-700 whitespace-nowrap p-2">
-              Customer
+          <div className="flex flex-col gap-2 bg-white ring-2 ring-gray-700 rounded-md p-2 mx-3 min-h-[200px]">
+            <div className="flex items-center">
+              <span className="flex bg-gray-200 font-medium rounded-md whitespace-nowrap leading-none p-2">
+                <Icons.user className="mr-2 h-4 w-4" />
+                Customer
+              </span>
+              <div className="flex-1"></div>
             </div>
-            <div className={clsx("flex items-center flex-wrap w-100 my-3", {})}>
+            <div className="flex items-center flex-wrap w-100 my-3">
               {completedDots > 0 &&
                 Array.from({ length: completedDots }).map((_, index) => (
                   <div
                     key={index}
-                    className={`h-12 w-12 mr-2 bg-gray-300 rounded-full cursor-none`}
+                    className={`h-12 w-12 m-2 bg-gray-300 rounded-full`}
                   ></div>
                 ))}
             </div>
           </div>
         </div>
-        <div className="flex flex-col gap-6 w-full md:w-[85%] lg:w-[70%] xl:w-[35%] 2xl:w-[40%] my-5">
-          <div className="flex justify-around gap-2 mx-3">
+        <div className="flex flex-col items-center gap-6 w-full md:w-[85%] lg:w-[70%] xl:w-[45%] 2xl:w-[40%] my-5">
+          <div className="flex justify-between w-[80%] lg:w-[66%] gap-2 mx-auto">
             <PlayerTimer handlePlayerTime={handlePlayerTime} socket={socket} />
             <TeamTimer handleTeamTime={handleTeamTime} socket={socket} />
           </div>
-          <section className="bg-white dark:bg-dark mx-3">
-            <div className="container">
-              <div className="flex flex-wrap">
-                <div className="w-full ">
-                  <div className="max-w-full overflow-x-auto">
-                    <table className="w-full table-auto">
-                      <thead className="text-center bg-gray-800">
-                        <tr>
-                          <th className={TdStyle.ThStyle}> Player </th>
-                          <th className={TdStyle.ThStyle}>Round1</th>
-                          <th className={TdStyle.ThStyle}>
-                            <button
-                              disabled={"round1" !== round || !isFirstPlayer}
-                              onClick={() => startNewRound()}
-                            >
-                              Round2
-                            </button>
-                          </th>
-                          <th className={TdStyle.ThStyle}>
-                            <button
-                              disabled={"round2" !== round || !isFirstPlayer}
-                              onClick={() => {
-                                setNewBatchSize(batchSize);
-                                setShowModal(true);
-                              }}
-                            >
-                              Round3
-                            </button>
-                          </th>
-                          <th className={TdStyle.ThStyle}>
-                            <button
-                              disabled={"round3" !== round || !isFirstPlayer}
-                              onClick={() => {
-                                setNewBatchSize(batchSize);
-                                setShowModal(true);
-                              }}
-                            >
-                              Round4
-                            </button>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {players.length > 0 &&
-                          Object.keys(playersTime).length !== 0 &&
-                          players.map((p) => {
-                            return (
-                              <tr key={p.id}>
-                                <td className={TdStyle.TdStyle}>{p.name}</td>
-                                {playersTime[p.name] &&
-                                  Object.entries(playersTime[p.name]).map(
-                                    ([key, value], index) => {
-                                      return (
-                                        <td
-                                          key={index}
-                                          className={TdStyle.TdStyle2}
-                                        >
-                                          {value}
-                                        </td>
-                                      );
-                                    },
-                                  )}
-                              </tr>
-                            );
-                          })}
-                        <tr>
-                          <td className={TdStyle.TdStyle}>First Value</td>
-                          <td className={TdStyle.TdStyle2}>
-                            {playersTime["round1"]["first"]}
-                          </td>
-                          <td className={TdStyle.TdStyle2}>
-                            {playersTime["round2"]["first"]}
-                          </td>
-                          <td className={TdStyle.TdStyle2}>
-                            {playersTime["round3"]["first"]}
-                          </td>
-                          <td className={TdStyle.TdStyle2}>
-                            {playersTime["round4"]["first"]}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className={TdStyle.TdStyle}>Total</td>
-                          <td className={TdStyle.TdStyle2}>
-                            {playersTime["round1"]["total"]}
-                          </td>
-                          <td className={TdStyle.TdStyle2}>
-                            {playersTime["round2"]["total"]}
-                          </td>
-                          <td className={TdStyle.TdStyle2}>
-                            {playersTime["round3"]["total"]}
-                          </td>
-                          <td className={TdStyle.TdStyle2}>
-                            {playersTime["round4"]["total"]}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            </div>
+          <section className="w-full bg-white mx-3 overflow-x-auto">
+            <table className="w-full table-auto">
+              <thead className="text-center">
+                <tr>
+                  <th className={TdStyle.ThStyle}>Player</th>
+                  <th className={`${TdStyle.ThStyle} cursor-default`}>
+                    Round1
+                  </th>
+                  <th className={TdStyle.ThStyle}>
+                    <button
+                      disabled={"round1" !== round || !isFirstPlayer}
+                      onClick={() => startNewRound()}
+                    >
+                      Round2
+                    </button>
+                  </th>
+                  <th className={TdStyle.ThStyle}>
+                    <button
+                      disabled={"round2" !== round || !isFirstPlayer}
+                      onClick={() => {
+                        setNewBatchSize(batchSize);
+                        setShowModal(true);
+                      }}
+                    >
+                      Round3
+                    </button>
+                  </th>
+                  <th className={TdStyle.ThStyle}>
+                    <button
+                      disabled={"round3" !== round || !isFirstPlayer}
+                      onClick={() => {
+                        setNewBatchSize(batchSize);
+                        setShowModal(true);
+                      }}
+                    >
+                      Round4
+                    </button>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {players.length > 0 &&
+                  Object.keys(playersTime).length !== 0 &&
+                  players.map((p) => {
+                    return (
+                      <tr key={p.id}>
+                        <td className={TdStyle.TdStyle}>
+                          {p.name === playerName ? `${p.name} (me)` : p.name}
+                        </td>
+                        {playersTime[p.name] &&
+                          Object.entries(playersTime[p.name]).map(
+                            ([key, value], index) => {
+                              return (
+                                <td key={index} className={TdStyle.TdStyle2}>
+                                  {value}
+                                </td>
+                              );
+                            },
+                          )}
+                      </tr>
+                    );
+                  })}
+                <tr>
+                  <td className={TdStyle.TdStyle}>First Value</td>
+                  <td className={TdStyle.TdStyle2}>
+                    {playersTime["round1"]["first"]}
+                  </td>
+                  <td className={TdStyle.TdStyle2}>
+                    {playersTime["round2"]["first"]}
+                  </td>
+                  <td className={TdStyle.TdStyle2}>
+                    {playersTime["round3"]["first"]}
+                  </td>
+                  <td className={TdStyle.TdStyle2}>
+                    {playersTime["round4"]["first"]}
+                  </td>
+                </tr>
+                <tr>
+                  <td className={TdStyle.TdStyle}>Customer</td>
+                  <td className={TdStyle.TdStyle2}>
+                    {playersTime["round1"]["total"]}
+                  </td>
+                  <td className={TdStyle.TdStyle2}>
+                    {playersTime["round2"]["total"]}
+                  </td>
+                  <td className={TdStyle.TdStyle2}>
+                    {playersTime["round3"]["total"]}
+                  </td>
+                  <td className={TdStyle.TdStyle2}>
+                    {playersTime["round4"]["total"]}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </section>
+          <Instruction />
         </div>
       </div>
 
@@ -452,24 +446,20 @@ const GameBoard = () => {
                     Select the batch size
                   </h3>
                   <button
-                    className="p-1 ml-auto bg-white border-0 text-black opacity-100 float-right text-xl leading-none font-semibold outline-none focus:outline-none"
+                    className="flex items-center p-1 ml-auto bg-white border-0 text-black opacity-100 font-semibold outline-none focus:outline-none"
                     onClick={() => setShowModal(false)}
                   >
-                    <span className="bg-transparent text-black opacity-5 h-6 w-6 text-2xl block outline-none focus:outline-none">
-                      ×
-                    </span>
+                    <Icons.close className="h-4 w-4" />
                   </button>
                 </div>
                 <div className="relative p-4">
                   <label className="mb-4">Batch Size</label>
                   <input
                     type="number"
+                    className="flex h-9 w-full mt-2 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-inner transition-colors placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-80"
                     placeholder="Enter the batch size"
-                    className="w-full border-2 rounded-md p-2 mt-1"
-                    min={0}
-                    max={4}
-                    defaultValue={BATCH_SIZE[round]}
                     onChange={(e) => setNewBatchSize(e.target.value)}
+                    defaultValue={BATCH_SIZE[round]}
                   />
                   <p className="mt-2 text-red-500 text-sm">{modalError}</p>
                 </div>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import io from "socket.io-client";
 import { useLocation } from "react-router-dom";
+import FaciliatorInstruction from "./FaciliatorInstruction";
 
 function generateRandomId() {
   const min = 100000;
@@ -26,12 +27,14 @@ function WaitingRoom() {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const paramValue = searchParams.get("f");
+  const [roomId, setRoomId] = useState("");
   const [playerName, setPlayerName] = useState("");
   const [registeredName, setRegisteredName] = useState("");
   const [players, setPlayers] = useState([]);
   const [playersPerTeam, setPlayersPerTeam] = useState(0);
   const [isRoomCreated, setRoomCreated] = useState(false);
   const [isFacilitator, setFacilitator] = useState(false);
+  const [isGameStarted, setGameStarted] = useState(false);
 
   useEffect(() => {
     setFacilitator(paramValue === "me");
@@ -102,6 +105,10 @@ function WaitingRoom() {
       document.cookie = `${key}=${value}`;
     });
 
+    socket.on("game_started", () => {
+      setGameStarted(true);
+    });
+
     return () => {
       socket.off("setCookie");
       socket.off("update_player_list");
@@ -112,12 +119,18 @@ function WaitingRoom() {
     e.preventDefault();
     if (playersPerTeam > 0 && playersPerTeam <= players.length) {
       const roomId = generateRandomId();
+      setRoomId(roomId);
       const data = { roomId, teamSize: playersPerTeam };
       socket.emit("start_game", data);
       return () => {
         socket.off("start_game");
       };
     }
+  };
+
+  const resetGame = (e) => {
+    e.preventDefault();
+    socket.emit("reset_game", { roomId });
   };
 
   const addPlayer = () => {
@@ -145,7 +158,7 @@ function WaitingRoom() {
   return (
     <>
       {!isRoomCreated && !registeredName && !isFacilitator && (
-        <div className="flex flex-col gap-6 m-auto p-6 w-[450px] rounded-xl border shadow bg-white">
+        <div className="flex flex-col gap-6 p-6 w-[90%] mx-auto md:w-[450px] rounded-xl border shadow bg-white">
           <h3 className="text-xl font-semibold leading-none tracking-tight">
             Enter your name
           </h3>
@@ -164,9 +177,9 @@ function WaitingRoom() {
         </div>
       )}
 
-      {!isRoomCreated ? (
+      {!isRoomCreated && (
         <>
-          <div className="m-auto w-[450px] p-6 flex flex-col gap-3 rounded-xl border shadow bg-white">
+          <div className="w-[90%] mx-auto md:w-[450px] p-6 flex flex-col gap-3 rounded-xl border shadow bg-white">
             <h3 className="text-xl font-semibold leading-none tracking-tight">
               Players in room
             </h3>
@@ -175,14 +188,14 @@ function WaitingRoom() {
               ensure all players are listed above before starting the game.
             </p>
 
-            <div className="flex flex-row gap-3">
+            <div className="flex flex-row flex-wrap gap-3">
               {players.length > 0 ? (
                 players.map((player, index) => (
                   <div
                     key={index}
                     className="relative grid select-none items-center whitespace-nowrap rounded-lg bg-gradient-to-tr from-gray-900 to-gray-800 py-1.5 px-3 font-sans text-sm font-bold text-white"
                   >
-                    <span class="">{player.name}</span>
+                    {player.name}
                   </div>
                 ))
               ) : (
@@ -194,27 +207,44 @@ function WaitingRoom() {
 
             {isFacilitator && (
               <>
-                <input
-                  value={playersPerTeam === 0 ? "" : playersPerTeam}
-                  placeholder="Enter players per team"
-                  onChange={(e) => setPlayersPerTeam(e.target.value)}
-                  className="flex h-9 w-full mt-5 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-inner transition-colors placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-80"
-                  disabled={!(players.length > 0)}
-                />
-                <button
-                  onClick={startGame}
-                  type="button"
-                  className="flex items-center justify-center w-full h-9 font-medium transition-colors bg-green-500 sm:w-auto rounded-md px-4 py-2 text-white disabled:opacity-60"
-                  disabled={!(players.length > 0)}
-                >
-                  Start Game
-                </button>
+                {isGameStarted ? (
+                  <button
+                    onClick={(e) => resetGame(e)}
+                    type="button"
+                    className="flex items-center justify-center w-full h-9 font-medium transition-colors bg-red-500 sm:w-auto rounded-md px-4 py-2 text-white"
+                  >
+                    Reset Game
+                  </button>
+                ) : (
+                  <>
+                    <input
+                      type="number"
+                      value={playersPerTeam === 0 ? "" : playersPerTeam}
+                      placeholder="Enter players per team"
+                      onChange={(e) => setPlayersPerTeam(e.target.value)}
+                      className="flex h-9 w-full mt-5 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-inner transition-colors placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-80"
+                      disabled={!(players.length > 0)}
+                    />
+                    <button
+                      onClick={(e) => startGame(e)}
+                      type="button"
+                      className="flex items-center justify-center w-full h-9 font-medium transition-colors bg-green-500 sm:w-auto rounded-md px-4 py-2 text-white disabled:opacity-60"
+                      disabled={!(players.length > 0)}
+                    >
+                      Start Game
+                    </button>
+                  </>
+                )}
               </>
             )}
           </div>
         </>
-      ) : (
-        ""
+      )}
+
+      {isFacilitator && (
+        <div className="flex w-[90%] mx-auto md:w-[450px]">
+          <FaciliatorInstruction />
+        </div>
       )}
     </>
   );

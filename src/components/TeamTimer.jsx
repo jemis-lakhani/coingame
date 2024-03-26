@@ -14,8 +14,14 @@ const TeamTimer = ({ socket, handleTeamTime }) => {
       }
       setStartTimer(start);
       setFirstValue(isFirstValue);
+      if (!start) {
+        handleTeamTime(seconds, miliSeconds, isFirstValue);
+      }
     });
-  }, [socket]);
+    return () => {
+      socket.off("manage_team_timer");
+    };
+  }, [socket, seconds, miliSeconds]);
 
   useEffect(() => {
     let secondInterval;
@@ -34,9 +40,8 @@ const TeamTimer = ({ socket, handleTeamTime }) => {
             return prevMiliSeconds + 1;
           }
         });
-      }, 15);
+      }, 20);
     } else {
-      handleTeamTime(seconds, miliSeconds, isFirstValue);
       clearInterval(secondInterval);
       clearInterval(miliSecondInterval);
     }
@@ -57,12 +62,12 @@ const TeamTimer = ({ socket, handleTeamTime }) => {
   return (
     <div className="p-2">
       <div className="flex flex-col items-center justify-start gap-1 sm:gap-4">
-        <span className="text-black">Team Time</span>
+        <span className="text-gray-800 font-semibold">Team Timer</span>
         <div className="flex gap-1 sm:gap-4">
-          <div className="h-12 w-12 sm:w-12 sm:h-12 lg:w-16 lg:h-16 flex justify-center items-center bg-gray-800 rounded-lg">
+          <div className="w-14 h-12 flex justify-center items-center bg-gradient-to-tr from-gray-900 to-gray-800 rounded-lg">
             <span className="text-2xl font-semibold text-white">{seconds}</span>
           </div>
-          <div className="h-12 w-12 sm:w-12 sm:h-12 lg:w-16 lg:h-16 flex justify-center items-center bg-gray-800 rounded-lg">
+          <div className="w-14 h-12 flex justify-center items-center bg-gradient-to-tr from-gray-900 to-gray-800 rounded-lg">
             <span className="text-2xl font-semibold text-white">
               {miliSeconds}
             </span>

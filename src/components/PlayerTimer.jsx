@@ -12,8 +12,14 @@ const PlayerTimer = ({ socket, handlePlayerTime }) => {
         setMiliSeconds(0);
       }
       setStartTimer(start);
+      if (!start) {
+        handlePlayerTime(seconds, miliSeconds);
+      }
     });
-  }, [socket]);
+    return () => {
+      socket.off("manage_player_timer");
+    };
+  }, [socket, miliSeconds, seconds]);
 
   useEffect(() => {
     let secondInterval;
@@ -32,9 +38,8 @@ const PlayerTimer = ({ socket, handlePlayerTime }) => {
             return prevMiliSeconds + 1;
           }
         });
-      }, 15);
+      }, 20);
     } else {
-      handlePlayerTime(seconds, miliSeconds);
       clearInterval(secondInterval);
       clearInterval(miliSecondInterval);
     }
@@ -48,12 +53,12 @@ const PlayerTimer = ({ socket, handlePlayerTime }) => {
   return (
     <div className="p-2">
       <div className="flex flex-col items-center justify-start gap-1 sm:gap-4">
-        <span className="text-black">Your Time</span>
+        <span className="text-gray-800 font-semibold">Your Timer</span>
         <div className="relative flex justify-center gap-1 sm:gap-4">
-          <div className="h-12 w-12 sm:w-12 sm:h-12 lg:w-16 lg:h-16 flex justify-center items-center bg-gray-800 rounded-lg">
+          <div className="w-14 h-12 flex justify-center items-center bg-gradient-to-tr from-gray-900 to-gray-800 rounded-lg">
             <span className="text-2xl font-semibold text-white">{seconds}</span>
           </div>
-          <div className="h-12 w-12 sm:w-12 sm:h-12 lg:w-16 lg:h-16 flex justify-center items-center bg-gray-800 rounded-lg">
+          <div className="w-14 h-12 flex justify-center items-center bg-gradient-to-tr from-gray-900 to-gray-800 rounded-lg">
             <span className="text-2xl font-semibold text-white">
               {miliSeconds}
             </span>

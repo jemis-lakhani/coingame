@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 
 const Dot = ({
+  playerIndex,
   playerId,
   dotIndex,
   teamId,
@@ -51,7 +52,13 @@ const Dot = ({
     <div
       key={dotIndex + teamId + roomId + playerId}
       className={`h-12 w-12 ${
-        clicked ? "bg-gray-800 pointer-events-none" : "bg-gray-300"
+        clicked
+          ? playerIndex % 2 === 0
+            ? "bg-gray-800 pointer-events-none"
+            : "bg-gray-300 pointer-events-none"
+          : playerIndex % 2 === 0
+          ? "bg-gray-300"
+          : "bg-gray-800"
       } rounded-full cursor-pointer`}
       onClick={() => handleClick()}
     ></div>
