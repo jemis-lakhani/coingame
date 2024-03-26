@@ -6,7 +6,7 @@ import clsx from "clsx";
 import TeamTimer from "./TeamTimer";
 import PlayerTimer from "./PlayerTimer";
 import { Icons } from "./Icons";
-import { BATCH_SIZE, NEXT_ROUND } from "../context/Constants";
+import { BATCH_SIZE, NEXT_ROUND } from "../Constants";
 import Instruction from "./Instruction";
 
 const TdStyle = {

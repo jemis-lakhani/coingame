@@ -19,7 +19,7 @@ function generateUserId() {
   }
   return userId;
 }
-
+console.log(process.env.REACT_APP_BACKEND_URL);
 const socket = io.connect(process.env.REACT_APP_BACKEND_URL);
 const SOCKET_STORAGE_KEY = "socketConnection";
 
