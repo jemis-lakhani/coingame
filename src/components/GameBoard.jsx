@@ -15,7 +15,7 @@ const TdStyle = {
   TdStyle2: `truncate text-dark border-b border-l border-r border-[#E8E8E8] bg-white p-3 text-center text-base font-medium`,
 };
 
-const socket = io.connect("http://localhost:5000");
+const socket = io.connect(process.env.REACT_APP_BACKEND_URL);
 
 const GameBoard = () => {
   // Params

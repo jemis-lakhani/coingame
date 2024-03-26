@@ -20,7 +20,7 @@ function generateUserId() {
   return userId;
 }
 
-const socket = io.connect("http://localhost:5000");
+const socket = io.connect(process.env.REACT_APP_BACKEND_URL);
 const SOCKET_STORAGE_KEY = "socketConnection";
 
 function WaitingRoom() {
