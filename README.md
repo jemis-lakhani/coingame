@@ -46,3 +46,24 @@ yarn start
 
 Frontend will run on:
 👉 http://localhost:3000
+
+4. Connect to Backend
+
+Make sure the backend server is running. Update the backend socket URL in the environment/config file if required.
+```
+## 🎮 How to Play
+
+Host creates a room.
+
+Teams join using the room code.
+
+Play multiple levels (coin flipping, coin moving).
+
+Time is recorded each round.
+
+Final results are shown at the end.
+
+## 📦 Build for Production
+```bash
+npm run build
+```
